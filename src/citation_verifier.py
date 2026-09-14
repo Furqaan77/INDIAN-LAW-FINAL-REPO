@@ -1,18 +1,24 @@
 """
-Citation Verifier ?" the most important file in this repo.
-Extracts every [CASE: id] the model claims, checks it against the database,
-and never presents an unverified citation as fact.
+Citation Verifier — the most important file in this repo.
+Extracts every [SOURCE: doc_id] the Python layer injected (never trusting
+the LLM's own claimed IDs — see rag_chain.py), checks each one against the
+database, and never presents an unverified citation as fact.
 """
 import re
-from db import case_exists, get_case
-import instrumentation
 
-CITATION_PATTERN = re.compile(r"\[(?:CASE:\s*)?(NI138(?:-\d+)+)\]")
+import instrumentation
+from db import document_exists, get_document
+from logging_config import get_logger
+
+logger = get_logger("citation_verifier")
+
+CITATION_PATTERN = re.compile(r"\[SOURCE:\s*([A-Za-z0-9_\-\.]+)\]")
+
 
 def extract_citations(answer_text: str):
     instrumentation.log("13", "Citation extraction START")
     instrumentation.start("Citation extraction")
-    matches = CITATION_PATTERN.findall(answer_text)
+    matches = CITATION_PATTERN.findall(answer_text or "")
     seen = set()
     ordered = []
     for m in matches:
@@ -24,6 +30,7 @@ def extract_citations(answer_text: str):
     instrumentation.log("13", f"Citations extracted: {len(ordered)}")
     return ordered
 
+
 def verify_citations(answer_text: str, validated_ids: set = None):
     instrumentation.log("14", "Citation verification START")
     instrumentation.start("Citation verification")
@@ -32,22 +39,23 @@ def verify_citations(answer_text: str, validated_ids: set = None):
     unverified = []
     clean_answer = answer_text
 
-    for case_id in claimed:
-        is_valid = case_exists(case_id)
-        if is_valid and validated_ids is not None:
-            if case_id not in validated_ids:
-                is_valid = False
+    for doc_id in claimed:
+        is_valid = document_exists(doc_id)
+        if is_valid and validated_ids is not None and doc_id not in validated_ids:
+            # Exists in the DB, but wasn't the doc_id the deterministic quote-match
+            # actually resolved to — treat as unverified rather than trust the LLM.
+            is_valid = False
 
         if is_valid:
-            case = get_case(case_id)
-            year = (case["date"] or "")[:4]
-            label = f"{case['title']} ({case['court']}, {year})"
+            doc = get_document(doc_id)
             verified.append({
-                "case_id": case_id, "title": case["title"],
-                "court": case["court"], "date": case["date"],
+                "doc_id": doc_id, "title": doc["title"],
+                "court": doc.get("court"), "date": doc.get("date"),
+                "source_type": doc.get("source_type"), "file_name": doc.get("file_name"),
             })
         else:
-            unverified.append(case_id)
+            unverified.append(doc_id)
+            logger.info("Unverified citation encountered: %s", doc_id)
 
     dur = instrumentation.end("Citation verification")
     instrumentation.log("14", f"Citation verification END: {dur:.3f} sec")

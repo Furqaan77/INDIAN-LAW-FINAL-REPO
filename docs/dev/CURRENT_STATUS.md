@@ -1,4 +1,4 @@
-# Current Status (NyayaSetu MVP)
+# Current Status (IndianLawGPT MVP)
 
 ## V2 Optimizations Completed
 - **Latency Optimization**: Reduced response times from 35s to ~2s using Groq API and `@st.cache_resource` for ML initialization.

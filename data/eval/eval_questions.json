@@ -1,0 +1,46 @@
+[
+  {
+    "question": "If a demand notice is returned undelivered, is a Section 138 complaint still valid?",
+    "expect_citation": true
+  },
+  {
+    "question": "What happens if the accused refuses to accept the statutory notice sent after a cheque bounces?",
+    "expect_citation": true
+  },
+  {
+    "question": "Can a cheque given as security, rather than for an existing debt, still attract Section 138 liability?",
+    "expect_citation": true
+  },
+  {
+    "question": "If the accused claims the debt was already repaid, does that rebut the presumption under Section 139 of the Negotiable Instruments Act?",
+    "expect_citation": true
+  },
+  {
+    "question": "Is a complaint under Section 138 valid if the legal notice was sent to an old address the accused no longer lives at?",
+    "expect_citation": true
+  },
+  {
+    "question": "What is the limitation period for filing a complaint under Section 142 after the cause of action arises?",
+    "expect_citation": true
+  },
+  {
+    "question": "What section of the Motor Vehicles Act governs how speed limits are fixed for vehicles on Indian roads?",
+    "expect_citation": true
+  },
+  {
+    "question": "What are the grounds for divorce under Section 13 of the Hindu Marriage Act?",
+    "expect_citation": true
+  },
+  {
+    "question": "What is the short title and extent of the Trade Marks Act, 1999?",
+    "expect_citation": true
+  },
+  {
+    "question": "Under Indian law, what is the standard warranty period for a spacecraft launch services contract?",
+    "expect_citation": false
+  },
+  {
+    "question": "What does French civil law say about the community property regime for married couples?",
+    "expect_citation": false
+  }
+]

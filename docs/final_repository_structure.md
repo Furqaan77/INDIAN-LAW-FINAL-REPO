@@ -1,8 +1,8 @@
-# NyayaSetu POC: Final Repository Structure
+# IndianLawGPT POC: Final Repository Structure
 
 ## Final Folder Structure
 ```text
-nyayasetu/
+indianlawgpt/
 │
 ├── src/                      # PRIMARY APPLICATION (Git-tracked)
 │   ├── app.py                # Streamlit UI
@@ -90,4 +90,4 @@ The `.gitignore` has been updated to explicitly ignore:
 *   **Hardware Constrained**: Inference takes 1-3 minutes per query due to the CPU-only environment.
 
 ## Conclusion
-The NyayaSetu POC is now strictly segregated. The Git tree reflects a clean, production-ready snapshot of the architecture, while the historical journey remains securely logged in the local ignored directories. The POC is frozen.
+The IndianLawGPT POC is now strictly segregated. The Git tree reflects a clean, production-ready snapshot of the architecture, while the historical journey remains securely logged in the local ignored directories. The POC is frozen.

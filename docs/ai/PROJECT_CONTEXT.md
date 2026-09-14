@@ -1,7 +1,7 @@
-# Project Context: NyayaSetu
+# Project Context: IndianLawGPT
 
 ## Vision
-NyayaSetu is an offline-capable, local-first RAG (Retrieval-Augmented Generation) system for Indian Legal judgments (specifically Section 138 of the Negotiable Instruments Act).
+IndianLawGPT is an offline-capable, local-first RAG (Retrieval-Augmented Generation) system for Indian Legal judgments (specifically Section 138 of the Negotiable Instruments Act).
 
 ## Core Directives
 1. **Zero Hallucination Tolerance**: The system strictly maps generated quotes to retrieved chunks. Unverified citations must be flagged to the user.

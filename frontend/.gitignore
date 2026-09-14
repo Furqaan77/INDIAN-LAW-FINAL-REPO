@@ -1,0 +1,7 @@
+node_modules
+dist
+*.local
+qa/shots
+qa/profile
+qa/last-research-url.txt
+qa/console.log

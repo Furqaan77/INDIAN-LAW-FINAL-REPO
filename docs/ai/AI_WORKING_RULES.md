@@ -1,4 +1,4 @@
-# AI Working Rules for NyayaSetu POC
+# AI Working Rules for IndianLawGPT POC
 
 Future AI tools and coding assistants must strictly adhere to the following rules when interacting with this codebase:
 
@@ -6,8 +6,11 @@ Future AI tools and coding assistants must strictly adhere to the following rule
 - Read the relevant documentation in `docs/ai/` before making changes.
 - Inspect existing code before rewriting functionality.
 - Do not introduce new frameworks, dependencies, or libraries unless absolutely necessary.
-- Do not change the core POC architecture without explicit approval from the user.
-- Do not replace SQLite, ChromaDB, Ollama, or Streamlit without explicit approval.
+- Do not change the core architecture without explicit approval from the user.
+- Do not replace SQLite, ChromaDB, or Streamlit without explicit approval. (As of V3, the
+  LLM/embedding providers are Anthropic Claude and OpenAI — this was an explicit, deliberate
+  change; do not revert it without equally explicit approval. Providers are swappable via
+  `.env`/`config.py` by design — prefer adding a provider branch over ad hoc code changes.)
 - Prefer small targeted changes over large rewrites.
 - If user requirements conflict with the current implementation, explain the conflict instead of silently changing the architecture.
 

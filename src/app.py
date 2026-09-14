@@ -1,4 +1,4 @@
-"""NyayaSetu POC UI. Run with: streamlit run app.py"""
+"""IndianLawGPT POC UI. Run with: streamlit run app.py"""
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -7,7 +7,7 @@ from rag_chain import answer_question
 from db import get_connection
 import instrumentation
 
-st.set_page_config(page_title="NyayaSetu POC", page_icon="⚖️", layout="centered")
+st.set_page_config(page_title="IndianLawGPT POC", page_icon="⚖️", layout="centered")
 
 st.markdown("""
 <style>
@@ -16,12 +16,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⚖️ NyayaSetu – Legal Research (POC)")
-st.caption("Domain: Section 138 Negotiable Instruments Act (cheque bounce) cases. "
-           "Runs locally or via optimized cloud acceleration.")
+st.title("⚖️ IndianLawGPT – Legal Research (POC)")
+st.caption("Retrieval-augmented Q&A over ingested case law and legal PDFs.")
 st.info("Citations shown as 'Verified' are checked against this app's local database "
-        "of curated judgments — not all of Indian case law. 'Unverified' may mean the "
-        "citation was fabricated, or it may be a real case outside this small sample.")
+        "of ingested documents — not the whole of Indian law. 'Unverified' may mean the "
+        "citation was fabricated, or it may be a real source outside this small sample.")
 
 query = st.text_area("Ask a legal question:", height=100,
                       placeholder="e.g. If a demand notice is returned undelivered, is the complaint still valid?")
@@ -51,32 +50,37 @@ if ask and query.strip():
     
     st.markdown("### Answer")
     import re
-    # Remove ONLY the exact citation token pattern [CASE: <case_id>]
-    displayed_answer = re.sub(r"\[CASE:\s*[A-Za-z0-9\-]+\]", "", result["clean_answer"])
+    # Remove ONLY the exact citation token pattern [SOURCE: <doc_id>]
+    displayed_answer = re.sub(r"\[SOURCE:\s*[A-Za-z0-9_\-\.]+\]", "", result["clean_answer"])
     # Clean up stranded 'and' left over from multiple citations
     displayed_answer = re.sub(r"\s+and\s+(?=\s|$|\.)", " ", displayed_answer)
     displayed_answer = displayed_answer.replace("  ", " ").strip()
-    
+
     st.write(displayed_answer)
     st.markdown("---")
-    
+
     if result["verified"]:
         st.markdown("### Sources")
         for c in result["verified"]:
-            date_val = c.get('date', 'Unknown Date')
-            st.markdown(f"**✓ {c['title']}**\n\n&nbsp;&nbsp;&nbsp;&nbsp;{c['court']} — {date_val}")
+            if c.get("source_type") == "pdf":
+                location = c.get("file_name") or "PDF document"
+            elif c.get("source_type") == "statute":
+                location = f"Act, enacted {c.get('date')}" if c.get("date") else "Act (enactment date unknown)"
+            else:
+                location = f"{c.get('court') or 'Unknown Court'} — {c.get('date') or 'Unknown Date'}"
+            st.markdown(f"**✓ {c['title']}**\n\n&nbsp;&nbsp;&nbsp;&nbsp;{location}")
 
     if result["unverified"]:
         st.markdown("### ⚠️ Unverified citations")
-        for cid in result["unverified"]:
-            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{cid}")
+        for did in result["unverified"]:
+            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{did}")
 
     badge = "🟢" if not result["unverified"] else "🔴"
     st.markdown(f"**{badge} Citation check:** {result['accuracy_note']}")
 
     with st.expander("Retrieved chunks used for this answer"):
-        for rc in result["retrieved_cases"]:
-            st.markdown(f"- {rc['title']} (`{rc['case_id']}`) — via {rc['source']} search")
+        for rc in result["retrieved_documents"]:
+            st.markdown(f"- {rc['title']} (`{rc['doc_id']}`) — via {rc['source']} search")
 
     dur_rend = instrumentation.end("Streamlit rendering")
     instrumentation.log("17", f"Streamlit rendering END: {dur_rend:.3f} sec")

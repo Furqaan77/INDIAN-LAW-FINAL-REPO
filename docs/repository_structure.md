@@ -1,9 +1,9 @@
-# NyayaSetu POC: Repository Structure
+# IndianLawGPT POC: Repository Structure
 
-This document outlines the organization of the NyayaSetu repository, explaining where core code, data, tools, and evaluation artifacts reside.
+This document outlines the organization of the IndianLawGPT repository, explaining where core code, data, tools, and evaluation artifacts reside.
 
 ## 1. Primary Application (`src/`)
-This is the core runtime logic of the NyayaSetu RAG application. Everything required to understand and run the pipeline is located here.
+This is the core runtime logic of the IndianLawGPT RAG application. Everything required to understand and run the pipeline is located here.
 *   `app.py`: Streamlit frontend UI.
 *   `rag_chain.py`: Orchestrator connecting retrieval, generation, and citation verification.
 *   `search.py`: Hybrid search implementation (ChromaDB + SQLite FTS5).
@@ -44,7 +44,7 @@ The `.gitignore` is configured to exclude:
 *   Generated evaluation outputs in `evaluation/`.
 *   Archive items (`archive/`).
 *   Environment files (`.env`).
-*   *It explicitly tracks `db/` and `data/` because the NyayaSetu POC is designed to run offline against this pre-built corpus.*
+*   *It explicitly tracks `db/` and `data/` because the IndianLawGPT POC is designed to run offline against this pre-built corpus.*
 
 ## 7. How to Run
 ### Primary Application

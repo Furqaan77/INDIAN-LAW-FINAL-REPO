@@ -1,4 +1,4 @@
-# NyayaSetu MVP: Full Technical Flow (V2)
+# IndianLawGPT MVP: Full Technical Flow (V2)
 
 There are two different kinds of data moving through the system:
 1. **Legal data** – judgments, chunks, embeddings, retrieved evidence.

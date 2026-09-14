@@ -11,6 +11,11 @@ venv/
 .venv/
 env/
 
+# Local database + vector index (~1GB, individual Chroma files exceed GitHub's 100MB limit).
+# Rebuild via: python src/init_db.py, then src/ingest.py / ingest_pdf.py / ingest_statutes.py
+# and src/chunk_embed.py — see README.md "Setup" and "Adding new data".
+db/
+
 # IDE / Editor
 .vscode/
 .idea/

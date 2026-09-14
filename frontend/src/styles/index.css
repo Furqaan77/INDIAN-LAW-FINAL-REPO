@@ -1,0 +1,278 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist/wght.css";
+@import "@fontsource-variable/geist-mono/wght.css";
+@import "@fontsource-variable/newsreader/opsz.css";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens — "The Research Brief"
+   Warm paper, deep ink, one oxblood accent. Green is reserved for verification;
+   slate marks statutes, umber marks case law. Everything else is hierarchy.
+   --------------------------------------------------------------------------- */
+:root {
+  --paper: #f5f2ea;
+  --paper-raised: #fbfaf6;
+  --paper-sunk: #ece7db;
+  --ink: #1c1a15;
+  --ink-2: #4b473e;
+  --ink-3: #7a7467;
+  --ink-4: #a9a295;
+  --rule: #e0d9ca;
+  --rule-strong: #cbc2ae;
+  --accent: #7d2e24;
+  --accent-ink: #5e2019;
+  --accent-wash: #f2e4dd;
+  --verify: #3d6a4c;
+  --verify-wash: #e2ebe1;
+  --caution: #8a5a12;
+  --caution-wash: #f3e7cd;
+  --statute: #2f4b6c;
+  --statute-wash: #e3e9ef;
+  --case: #6d4b2e;
+  --case-wash: #efe6db;
+  --highlight: #f1dd9f;
+  --shadow: 45 34 14;
+}
+
+:root[data-theme="dark"] {
+  --paper: #14130f;
+  --paper-raised: #1c1b16;
+  --paper-sunk: #0e0d0a;
+  --ink: #ede7d9;
+  --ink-2: #bfb7a6;
+  --ink-3: #8c8576;
+  --ink-4: #5f594d;
+  --rule: #2b2922;
+  --rule-strong: #3b3830;
+  --accent: #e2917d;
+  --accent-ink: #f1ae9c;
+  --accent-wash: #37221c;
+  --verify: #92c19e;
+  --verify-wash: #1e2a21;
+  --caution: #e1b562;
+  --caution-wash: #32291a;
+  --statute: #a2bad8;
+  --statute-wash: #1d2530;
+  --case: #d4ad89;
+  --case-wash: #2d241c;
+  --highlight: #574821;
+  --shadow: 0 0 0;
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-paper: var(--paper);
+  --color-raised: var(--paper-raised);
+  --color-sunk: var(--paper-sunk);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-verify: var(--verify);
+  --color-verify-wash: var(--verify-wash);
+  --color-caution: var(--caution);
+  --color-caution-wash: var(--caution-wash);
+  --color-statute: var(--statute);
+  --color-statute-wash: var(--statute-wash);
+  --color-case: var(--case);
+  --color-case-wash: var(--case-wash);
+  --color-mark: var(--highlight);
+
+  --shadow-lift: 0 1px 2px rgb(var(--shadow) / 0.05), 0 10px 28px -12px rgb(var(--shadow) / 0.18);
+  --shadow-float: 0 2px 6px rgb(var(--shadow) / 0.08), 0 28px 72px -20px rgb(var(--shadow) / 0.32);
+
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-breathe: breathe 1.8s var(--ease-soft) infinite;
+  --animate-sheen: sheen 1.6s linear infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes sheen {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    background: var(--paper);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  body {
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--accent-wash);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: default;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Small uppercase label used for section names and metadata keys. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* The legal analysis: an editorial reading column. */
+  .brief {
+    font-family: var(--font-serif);
+    font-optical-sizing: auto;
+    font-size: 1.1875rem;
+    line-height: 1.72;
+    color: var(--ink);
+    text-wrap: pretty;
+    hanging-punctuation: first;
+  }
+
+  .brief > * + * {
+    margin-top: 0.95em;
+  }
+
+  .brief h1, .brief h2, .brief h3, .brief h4 {
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-top: 2.4rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .brief > :is(h1, h2, h3, h4):first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .brief :is(h1, h2, h3, h4) + * {
+    margin-top: 0.7rem;
+  }
+
+  .brief strong {
+    font-weight: 600;
+  }
+
+  .brief em {
+    font-style: italic;
+  }
+
+  .brief :is(ul, ol) {
+    padding-left: 1.3em;
+  }
+
+  .brief ul {
+    list-style: disc;
+  }
+
+  .brief ol {
+    list-style: decimal;
+  }
+
+  .brief li + li {
+    margin-top: 0.4em;
+  }
+
+  .brief li::marker {
+    color: var(--ink-4);
+  }
+
+  .brief blockquote {
+    border-left: 2px solid var(--rule-strong);
+    padding-left: 1em;
+    color: var(--ink-2);
+    font-style: italic;
+  }
+
+  .brief code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+  }
+
+  /* Statute and judgment text in the document reader. */
+  .legal-text {
+    font-family: var(--font-serif);
+    font-optical-sizing: auto;
+    font-size: 1.0938rem;
+    line-height: 1.78;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+
+  mark.evidence {
+    color: inherit;
+    background: linear-gradient(transparent 10%, var(--highlight) 10%, var(--highlight) 92%, transparent 92%);
+    border-radius: 2px;
+    padding: 0 0.06em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .skeleton {
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--paper-sunk) 0%, var(--rule) 50%, var(--paper-sunk) 100%);
+    background-size: 200% 100%;
+    animation: var(--animate-sheen);
+  }
+
+  .scroll-quiet {
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule-strong) transparent;
+  }
+}

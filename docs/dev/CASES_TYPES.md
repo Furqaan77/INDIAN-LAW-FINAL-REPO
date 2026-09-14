@@ -1,10 +1,10 @@
 
 
-# NyayaSetu POC — Section 138 Case Categories
+# IndianLawGPT POC — Section 138 Case Categories
 
 ## Overall Scope
 
-NyayaSetu POC will contain **100–200 curated Section 138 cheque-bounce judgments from the Delhi jurisdiction**.
+IndianLawGPT POC will contain **100–200 curated Section 138 cheque-bounce judgments from the Delhi jurisdiction**.
 
 All cases are related to **cheque bounce under Section 138 of the Negotiable Instruments Act**.
 
@@ -169,7 +169,7 @@ The court may need to determine:
 
 # Important: Cases Can Overlap
 
-These categories are only for ensuring that the NyayaSetu dataset has **variety**.
+These categories are only for ensuring that the IndianLawGPT dataset has **variety**.
 
 One case may involve several categories.
 
@@ -231,7 +231,7 @@ So we should **not force every case into only one category**.
 
 ---
 
-## Simple NyayaSetu POC Scope Statement
+## Simple IndianLawGPT POC Scope Statement
 
-> **NyayaSetu POC is an offline AI-powered legal research system for Section 138 cheque-bounce cases. The initial corpus will contain approximately 100–200 curated judgments from the Delhi jurisdiction, covering five major legal areas: legal notice and service, debt and security cheques, presumptions and burden of proof, limitation and deadlines, and company/director liability.**
+> **IndianLawGPT POC is an offline AI-powered legal research system for Section 138 cheque-bounce cases. The initial corpus will contain approximately 100–200 curated judgments from the Delhi jurisdiction, covering five major legal areas: legal notice and service, debt and security cheques, presumptions and burden of proof, limitation and deadlines, and company/director liability.**
 
