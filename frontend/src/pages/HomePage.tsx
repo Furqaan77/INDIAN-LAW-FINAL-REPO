@@ -4,20 +4,15 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CommandBar } from "../components/research/CommandBar";
 import { SourceGlyph } from "../components/primitives";
+import { DEMO_QUESTIONS } from "../demo/demoQuestions";
 import { useCorpusStats } from "../hooks/useCorpusStats";
 import { api } from "../lib/api";
+import { loadEngineSelection } from "../lib/engines";
 import { actShortName, formatNumber } from "../lib/format";
-import { destinationFor, type ModeId } from "../lib/modes";
+import { destinationFor } from "../lib/modes";
 import type { CorpusStats, MappedAct } from "../types";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-
-const EXAMPLES: { text: string; mode: ModeId }[] = [
-  { text: "Can a cheque bounce complaint proceed if the demand notice was sent late?", mode: "research" },
-  { text: "Which provision governs anticipatory bail under the new criminal laws?", mode: "research" },
-  { text: "How does the BNS treat cheating compared with the IPC?", mode: "research" },
-  { text: "Security cheques and legally enforceable debt", mode: "cases" },
-];
 
 export function HomePage() {
   const { stats, failed } = useCorpusStats();
@@ -76,24 +71,28 @@ function ExampleQueries() {
   const navigate = useNavigate();
   return (
     <div>
-      <p className="eyebrow">Try</p>
+      <p className="eyebrow">Try — answered by the engines selected above</p>
       <ul className="mt-3 grid gap-x-8 sm:grid-cols-2">
-        {EXAMPLES.map((example) => (
-          <li key={example.text} className="border-t border-rule">
+        {DEMO_QUESTIONS.map((example) => (
+          <li key={example.id} className="border-t border-rule">
             <button
               type="button"
               onClick={() => {
-                const destination = destinationFor(example.mode, example.text);
+                if (example.href) {
+                  navigate(example.href);
+                  return;
+                }
+                const destination = destinationFor("research", example.question, loadEngineSelection());
                 if (destination.ok) navigate(destination.to);
               }}
               className="group flex w-full items-start gap-3 py-3 text-left text-[14.5px] leading-snug text-ink-2 transition-colors hover:text-ink"
             >
               <span className="mt-[3px] w-3 shrink-0 text-center">
-                <SourceGlyph type={example.mode === "cases" ? "case_law" : "statute"} />
+                <SourceGlyph type={example.capability === "Case law" ? "case_law" : "statute"} />
               </span>
               <span className="flex-1">
-                {example.text}
-                {example.mode === "cases" && <span className="ml-2 text-[12px] text-ink-4">Case search</span>}
+                {example.question}
+                <span className="mt-0.5 block text-[11.5px] text-ink-4">{example.capability}</span>
               </span>
               <ArrowRight
                 aria-hidden

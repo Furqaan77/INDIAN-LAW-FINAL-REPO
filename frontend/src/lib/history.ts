@@ -1,12 +1,15 @@
 import { useSyncExternalStore } from "react";
-import type { ResearchMode, ResearchResult } from "../types";
+import type { EngineKey, ResearchMode, ResearchResult } from "../types";
 
 export interface ResearchEntry {
   id: string;
   question: string;
   mode: ResearchMode;
   createdAt: number;
+  /** The first completed answer (older entries only have this). */
   result: ResearchResult;
+  /** Completed answers per engine for this research, all from the same frozen evidence. */
+  engines?: Partial<Record<EngineKey, ResearchResult>>;
 }
 
 const STORAGE_KEY = "indianlawgpt.research-history.v1";
@@ -60,6 +63,14 @@ export const history = {
   get: (id: string) => read().find((entry) => entry.id === id),
   save: (entry: ResearchEntry) =>
     write([entry, ...read().filter((existing) => existing.id !== entry.id)].slice(0, MAX_ENTRIES)),
+  /** Adds one engine's completed answer to a research entry, creating the entry on the first answer. */
+  saveEngine: (id: string, question: string, mode: ResearchMode, engine: EngineKey, result: ResearchResult) => {
+    const existing = read().find((entry) => entry.id === id);
+    const entry: ResearchEntry = existing
+      ? { ...existing, engines: { ...existing.engines, [engine]: result } }
+      : { id, question, mode, createdAt: Date.now(), result, engines: { [engine]: result } };
+    write([entry, ...read().filter((other) => other.id !== id)].slice(0, MAX_ENTRIES));
+  },
   remove: (id: string) => write(read().filter((entry) => entry.id !== id)),
   clear: () => write([]),
 };

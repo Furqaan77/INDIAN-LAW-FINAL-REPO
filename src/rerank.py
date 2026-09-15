@@ -1,15 +1,24 @@
 """
-Context selection: combines the semantic similarity score with a cheap
-lexical-overlap signal (no extra API/model call), then caps how many chunks
-any single document can contribute so the LLM's context window isn't
-dominated by one long document. This runs between hybrid_search() and
-prompt assembly in rag_chain.py.
+Context selection: decides which retrieved chunks reach the LLM. Runs between hybrid_search()'s
+retrievers and prompt assembly in rag_chain.py.
 
-Kept deliberately simple (no cross-encoder) for this POC — swap in a real
-reranker later by replacing rerank() without changing its call sites.
+Default (RERANK_STRATEGY=rrf) — Reciprocal Rank Fusion. Each retriever (semantic chunk search,
+keyword/BM25 document search, explicit legal-reference lookup, old/new code mapping) returns its own
+ranked list. Their scores are not on one scale (cosine similarity, BM25, a deterministic lookup), so
+ranks are fused rather than scores:
+
+    rrf(document) = sum over the lists containing it of 1 / (k + rank)     rank starts at 1, k = RRF_K
+
+A document found by several retrievers accumulates contributions, and a strong keyword-only match is
+no longer capped below every semantic hit. Ties break deterministically: best semantic similarity,
+then best rank in any single list, then doc_id. search.py reserves slots for evidence the query
+explicitly requires, fills the rest in fused order and gives each document one evidence block.
+
+RERANK_STRATEGY=weighted keeps the previous scoring (0.75 x semantic similarity + 0.25 x query-word
+overlap) for comparison and rollback.
 """
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional, Sequence
 
 from config import settings
 from logging_config import get_logger
@@ -17,6 +26,38 @@ from logging_config import get_logger
 logger = get_logger("rerank")
 
 _TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9]+")
+
+
+def rrf_order(
+    rankings: Dict[str, Sequence[str]], k: Optional[int] = None, semantic_scores: Optional[Dict[str, float]] = None,
+) -> List[Dict]:
+    """rankings: retriever name -> doc_ids, best first (repeats are ignored after the first).
+    Returns one entry per document, best first: {doc_id, rrf_score, retrieval_ranks}."""
+    k = settings.rrf_k if k is None else k
+    semantic_scores = semantic_scores or {}
+    fused: Dict[str, Dict] = {}
+    for name, doc_ids in rankings.items():
+        rank = 0
+        seen = set()
+        for doc_id in doc_ids:
+            if not doc_id or doc_id in seen:
+                continue
+            seen.add(doc_id)
+            rank += 1
+            entry = fused.setdefault(doc_id, {"doc_id": doc_id, "rrf_score": 0.0, "retrieval_ranks": {}})
+            entry["rrf_score"] += 1.0 / (k + rank)
+            entry["retrieval_ranks"][name] = rank
+
+    def order(entry):
+        semantic = semantic_scores.get(entry["doc_id"])
+        return (
+            -round(entry["rrf_score"], 12),
+            -(semantic if semantic is not None else -1.0),
+            min(entry["retrieval_ranks"].values()),
+            entry["doc_id"],
+        )
+
+    return sorted(fused.values(), key=order)
 
 
 def _query_terms(query: str) -> List[str]:
@@ -31,9 +72,9 @@ def _keyword_overlap_score(query_terms: List[str], text: str) -> float:
     return hits / len(query_terms)
 
 
-def rerank(hits: List[Dict], query: str, top_k: int = 5, max_per_doc: int = None) -> List[Dict]:
-    """hits: list of dicts with at least 'doc_id', 'text', 'score' (semantic
-    similarity in [0,1] or None for keyword-only hits)."""
+def weighted_rerank(hits: List[Dict], query: str, top_k: int = 5, max_per_doc: int = None) -> List[Dict]:
+    """Previous strategy. hits: dicts with at least 'doc_id', 'text', 'score' (semantic similarity in
+    [0,1], or None for keyword-only hits, which therefore score at most 0.25)."""
     if not hits:
         return []
 
@@ -62,3 +103,7 @@ def rerank(hits: List[Dict], query: str, top_k: int = 5, max_per_doc: int = None
 
     logger.debug("Reranked %d hits -> %d selected (top_k=%d, max_per_doc=%d)", len(hits), len(selected), top_k, max_per_doc)
     return selected
+
+
+# Earlier name of the weighted strategy, kept so existing imports keep working.
+rerank = weighted_rerank

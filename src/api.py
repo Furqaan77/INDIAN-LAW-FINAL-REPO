@@ -16,7 +16,7 @@ import queue
 import re
 import threading
 import time
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +27,7 @@ from config import settings
 from db import get_corpus_stats, get_document, get_documents_brief, list_act_sections, list_mapped_acts
 from ingest_statutes import make_statute_doc_id
 from logging_config import get_logger
+from engines import engine_status, run_engine
 from rag_chain import answer_question
 from search import hybrid_search
 from vector_store import get_vector_store
@@ -48,9 +49,23 @@ app.add_middleware(
 )
 
 
+EngineKey = Literal["claude", "lora_qwen", "qwen"]
+
+
 class ResearchRequest(BaseModel):
     question: str = Field(min_length=3, max_length=2000)
     mode: Literal["research", "quick"] = "research"
+    # Answer engine (engines.py). Omitted: the configured LLM_PROVIDER, exactly as before.
+    engine: Optional[EngineKey] = None
+    # Reuse a frozen evidence bundle so a second engine answers from the identical evidence.
+    evidence_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class AnswerRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=2000)
+    model: EngineKey = "claude"
+    mode: Literal["research", "quick"] = "research"
+    evidence_id: Optional[str] = Field(default=None, max_length=64)
 
 
 def _readable(text):
@@ -152,12 +167,34 @@ def _readable_citation(citation: Dict) -> Dict:
     return citation
 
 
+def _citation_check(result: Dict, citations: List[Dict]) -> Dict:
+    """What the deterministic citation check did with the model's proposed citations: quotations matched to the
+    retrieved evidence, quotations rejected (not found in the evidence, so their citations were dropped), and
+    sources verified against the database. Reported, never repaired."""
+    proposed = [c for c in result.get("extracted_evidence") or [] if isinstance(c, dict)]
+    mapped_quotes = {quote for citation in result.get("citations") or [] for quote in citation.get("quotes") or []}
+    rejected = [
+        {"doc_id": c.get("doc_id") or None, "quote": _readable(c.get("evidence_quote") or "")}
+        for c in proposed if (c.get("evidence_quote") or "") not in mapped_quotes
+    ]
+    return {
+        "proposed": len(proposed),
+        "matched": len(proposed) - len(rejected),
+        "rejected": len(rejected),
+        "rejected_quotes": rejected[:10],
+        "sources": len(citations),
+        "sources_verified": sum(1 for c in citations if c.get("verified")),
+        "sources_unverified": len(result.get("unverified") or []),
+    }
+
+
 def _public_result(result: Dict, question: str) -> Dict:
     citations = [_readable_citation(c) for c in result.get("citations") or []]
     retrieved = result.get("retrieved_documents") or []
     for document in retrieved:
         document["excerpt"] = _readable(document.get("excerpt"))
     return {
+        "citation_check": _citation_check(result, citations),
         "question": question,
         "mode": result.get("mode"),
         "answer_markdown": _readable(result.get("answer_markdown") or result.get("clean_answer") or ""),
@@ -168,9 +205,19 @@ def _public_result(result: Dict, question: str) -> Dict:
         "unmatched_citations": result.get("unmatched_citations", 0),
         "accuracy_note": result.get("accuracy_note"),
         "error": result.get("error"),
-        "models": {"llm": settings.anthropic_model, "embedding": settings.embedding_model},
+        "models": {
+            "llm": (result.get("engine") or {}).get("model") or settings.llm_model, "embedding": settings.embedding_model,
+        },
+        "engine": result.get("engine"),
+        "evidence": result.get("evidence"),
         "completed_at": time.time(),
     }
+
+
+def _run(question: str, mode: str, engine: Optional[str], evidence_id: Optional[str], on_stage=None) -> Dict:
+    if engine is None:
+        return answer_question(question, top_k=TOP_K_BY_MODE[mode], on_stage=on_stage, mode=mode)
+    return run_engine(question, engine, top_k=TOP_K_BY_MODE[mode], mode=mode, evidence_id=evidence_id, on_stage=on_stage)
 
 
 def _sse(event: str, data: Dict) -> str:
@@ -195,7 +242,7 @@ def stats():
         except Exception:
             logger.exception("Could not count vector store passages")
             value["passages"] = None
-        value["models"] = {"llm": settings.anthropic_model, "embedding": settings.embedding_model}
+        value["models"] = {"llm": settings.llm_model, "embedding": settings.embedding_model}
         _stats_cache.update(value=value, at=now)
     return _stats_cache["value"]
 
@@ -213,9 +260,7 @@ def research(request: ResearchRequest):
 
     def worker():
         try:
-            result = answer_question(
-                question, top_k=TOP_K_BY_MODE[request.mode], on_stage=on_stage, mode=request.mode,
-            )
+            result = _run(question, request.mode, request.engine, request.evidence_id, on_stage=on_stage)
             events.put(("result", _public_result(result, question)))
         except Exception:
             logger.exception("Research request failed for question=%r", question)
@@ -241,6 +286,26 @@ def research(request: ResearchRequest):
         stream(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/answer")
+def answer(request: AnswerRequest):
+    """Non-streaming answer from one engine: retrieve (or reuse frozen evidence) → generate → validate →
+    map → verify. The response's `engine.evidence_id` can be passed back to answer with another engine
+    from the identical evidence. An unavailable engine fails with its own message; there is no fallback."""
+    question = request.question.strip()
+    try:
+        result = _run(question, request.mode, request.model, request.evidence_id)
+    except Exception:
+        logger.exception("Answer request failed for question=%r", question)
+        raise HTTPException(status_code=500, detail="The research pipeline failed unexpectedly. Please try again.")
+    return _public_result(result, question)
+
+
+@app.get("/api/engines")
+def engines():
+    """Answer engines and whether each is reachable right now (no generation is performed)."""
+    return {"engines": engine_status()}
 
 
 @app.get("/api/search")

@@ -1,3 +1,4 @@
+import type { EngineKey } from "../types";
 import { newResearchId } from "./history";
 
 export type ModeId = "research" | "quick" | "statutes" | "cases" | "compare";
@@ -78,12 +79,15 @@ export function parseSectionReference(text: string): { act: string; section: str
 
 export type Destination = { ok: true; to: string } | { ok: false; message: string };
 
-export function destinationFor(mode: ModeId, text: string): Destination {
+export function destinationFor(mode: ModeId, text: string, engines?: EngineKey[]): Destination {
   const q = text.trim();
   switch (mode) {
     case "research":
-    case "quick":
-      return { ok: true, to: `/research/${newResearchId()}?${new URLSearchParams({ q, mode })}` };
+    case "quick": {
+      const params = new URLSearchParams({ q, mode });
+      if (engines?.length) params.set("engines", engines.join(","));
+      return { ok: true, to: `/research/${newResearchId()}?${params}` };
+    }
     case "statutes":
       return { ok: true, to: `/search?${new URLSearchParams({ q, type: "statute" })}` };
     case "cases":

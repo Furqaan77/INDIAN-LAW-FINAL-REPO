@@ -12,7 +12,9 @@ matched no retrieved text is dropped. The mapped doc_ids are appended as
 [SOURCE: id] tokens and handed to citation_verifier.py, the final gate
 against a citation that doesn't exist in the database.
 """
+import hashlib
 import re
+import time
 from collections import OrderedDict
 
 import instrumentation
@@ -20,7 +22,7 @@ from citation_verifier import verify_citations
 from config import settings
 from llm_provider import get_llm_provider
 from logging_config import get_logger
-from search import hybrid_search
+from search import hybrid_search_with_plan
 
 logger = get_logger("rag_chain")
 
@@ -50,6 +52,18 @@ Each entry has "doc_id" (copied from the cited excerpt's '--- doc_id: ... ---' h
 2. "answer" — the Markdown answer, marking each claim with [n], where n is the 1-based position of its \
 entry in citations. Never put a citation list inside the answer text.
 """
+
+# The distillation answer instruction (the Claude teacher's dataset prompt, and what the LoRA student was
+# trained with). The research app does not send it; the answer engines append it for every engine when
+# ENGINE_ANSWER_INSTRUCTION=dataset so that all models see the identical prompt.
+DATASET_ANSWER_INSTRUCTION = """Dataset answer requirements:
+- Answer the question directly in the first sentence.
+- Be concise: aim for 500 to 1,200 characters. Go longer only when the legal issue genuinely needs it. Never repeat a point, a caveat or a conclusion.
+- Use only the excerpts above. Do not mention any Act, section, case or citation that does not appear in them.
+- Mark every supported claim with [n]. When the answer compares or relies on several provisions or judgments, cite each one where it is used. Keep what the excerpts establish separate from anything they do not address.
+- Stop once the question is answered: no closing recap, "Thus"/"Therefore" summary or "Conclusion" section that repeats earlier sentences.
+- If the excerpts do not answer the question, reply in at most three sentences (about 500 characters): what they do establish [n] and, once, what is missing. Do not restate the gap, add a conclusion, or speculate.
+- Use "### " headings only when the answer has several distinct parts."""
 
 QUICK_ANSWER_INSTRUCTION = (
     "Answer mode: QUICK ANSWER. Reply in two to four sentences with no headings, "
@@ -146,6 +160,8 @@ def _retrieved_payload(h, cited_doc_ids):
     return {
         **_hit_fields(h), "source": h["source"], "score": h.get("score"),
         "rerank_score": h.get("rerank_score"), "excerpt": h["text"], "cited": h["doc_id"] in cited_doc_ids,
+        "retrieval_ranks": h.get("retrieval_ranks"), "required_reason": h.get("required_reason"),
+        "chunk_id": h.get("chunk_id"), "chunk_ids": h.get("chunk_ids"), "context_span": h.get("context_span"),
     }
 
 
@@ -167,10 +183,7 @@ def _empty_result(message, accuracy_note, mode, error=None, hits=None):
     return result
 
 
-def answer_question(question: str, top_k: int = 5, on_stage=None, mode: str = "research"):
-    """`on_stage(stage, status, detail)` is called as real pipeline steps start and
-    finish (semantic, keyword, ranking, drafting, verification); `mode="quick"` asks
-    for a short answer from the same retrieval and verification pipeline."""
+def _stage_emitter(on_stage):
     def emit(stage, status, detail=None):
         if on_stage is None:
             return
@@ -178,16 +191,62 @@ def answer_question(question: str, top_k: int = 5, on_stage=None, mode: str = "r
             on_stage(stage, status, detail or {})
         except Exception:
             logger.exception("on_stage callback raised; continuing")
+    return emit
 
+
+def evidence_fingerprint(question: str, top_k: int, hits) -> str:
+    """Identifies one frozen evidence selection: the question, top_k and every selected passage."""
+    digest = hashlib.sha256(f"{' '.join(question.lower().split())}|{top_k}".encode("utf-8"))
+    for hit in hits:
+        digest.update(hit["doc_id"].encode("utf-8"))
+        digest.update(hashlib.sha1((hit.get("text") or "").encode("utf-8")).digest())
+    return "ev-" + digest.hexdigest()[:16]
+
+
+def retrieve_evidence(question: str, top_k: int = 5, on_stage=None):
+    """Retrieval, reranking and evidence selection only. The returned bundle is everything generation
+    needs, so several answer models can be given the identical evidence (see engines.py)."""
+    emit = _stage_emitter(on_stage)
+    started = time.perf_counter()
     try:
-        hits = hybrid_search(question, top_k=top_k, on_stage=emit)
+        hits, retrieval_plan = hybrid_search_with_plan(question, top_k=top_k, on_stage=emit)
     except Exception:
         logger.exception("Retrieval failed for question=%r", question)
         emit("search", "failed")
+        return {"question": question, "top_k": top_k, "hits": [], "retrieval_plan": None, "error": "retrieval",
+                "retrieval_s": time.perf_counter() - started, "created_at": time.time(), "evidence_id": None}
+    return {
+        "question": question, "top_k": top_k, "hits": hits, "retrieval_plan": retrieval_plan, "error": None,
+        "retrieval_s": time.perf_counter() - started, "created_at": time.time(),
+        "evidence_id": evidence_fingerprint(question, top_k, hits),
+    }
+
+
+def answer_question(question: str, top_k: int = 5, on_stage=None, mode: str = "research", answer_instruction: str = None):
+    """`on_stage(stage, status, detail)` is called as real pipeline steps start and
+    finish (semantic, keyword, ranking, drafting, verification); `mode="quick"` asks
+    for a short answer from the same retrieval and verification pipeline.
+    `answer_instruction`, when given, is appended to the question like the quick-answer instruction
+    (used by the distillation teacher; the app never passes it)."""
+    evidence = retrieve_evidence(question, top_k=top_k, on_stage=on_stage)
+    return answer_from_evidence(question, evidence, mode=mode, answer_instruction=answer_instruction, on_stage=on_stage)
+
+
+def answer_from_evidence(question: str, evidence, mode: str = "research", answer_instruction: str = None, on_stage=None,
+                         generate_fn=None, model_label: str = None, unavailable_message: str = None):
+    """Prompt → generation → citation mapping → citation verification on an already-selected evidence bundle.
+    `generate_fn(system_prompt, user_content)` replaces the configured LLM provider (answer engines use it
+    to pick a model per request); every model goes through the same mapping and verification below."""
+    emit = _stage_emitter(on_stage)
+    started = time.perf_counter()
+    if evidence.get("error"):
         return _empty_result(
             "The search service is currently unavailable. Please try again shortly.",
             "Retrieval failed", mode, error="retrieval",
         )
+    hits, retrieval_plan = evidence["hits"], evidence["retrieval_plan"]
+    retrieval_s = 0.0 if evidence.get("reused") else evidence.get("retrieval_s", 0.0)
+    started -= retrieval_s
 
     context = build_context(hits)
 
@@ -202,22 +261,32 @@ def answer_question(question: str, top_k: int = 5, on_stage=None, mode: str = "r
     user_content = f"Excerpts:\n{context}\n\nQuestion: {question}"
     if mode == "quick":
         user_content += f"\n\n{QUICK_ANSWER_INSTRUCTION}"
+    if answer_instruction:
+        user_content += f"\n\n{answer_instruction}"
     dur_prompt = instrumentation.end("Prompt construction")
     instrumentation.log("9", f"Prompt construction END: {dur_prompt:.3f} sec")
 
-    emit("drafting", "started", {"model": settings.anthropic_model, "sources": sum(1 for h in hits if h["text"])})
+    model_label = model_label or settings.llm_model
+    emit("drafting", "started", {"model": model_label, "sources": sum(1 for h in hits if h["text"])})
     call_num = instrumentation.increment_api_call()
     instrumentation.log("LLM", f"Generation call #{call_num} START")
     instrumentation.start("Actual API call")
+    generation_started = time.perf_counter()
     try:
-        llm_result = get_llm_provider().generate_structured_answer(SYSTEM_PROMPT, user_content)
+        generate = generate_fn or get_llm_provider().generate_structured_answer
+        llm_result = generate(SYSTEM_PROMPT, user_content)
     except Exception:
-        logger.exception("LLM generation failed for question=%r", question)
+        logger.exception("LLM generation failed for question=%r (%s)", question, model_label)
         emit("drafting", "failed")
-        return _empty_result(
-            "The answer generation service is currently unavailable. Please try again shortly.",
+        failed = _empty_result(
+            unavailable_message or "The answer generation service is currently unavailable. Please try again shortly.",
             "Answer generation failed", mode, error="generation", hits=hits,
         )
+        failed["timings"] = {"retrieval_s": round(retrieval_s, 3), "generation_s": round(time.perf_counter() - generation_started, 3),
+                             "total_s": round(time.perf_counter() - started, 3)}
+        failed["user_content"] = user_content
+        return failed
+    generation_s = time.perf_counter() - generation_started
     dur_call = instrumentation.end("Actual API call")
     instrumentation.log("LLM", f"Generation call END: {dur_call:.3f} sec")
     emit("drafting", "done")
@@ -274,7 +343,19 @@ def answer_question(question: str, top_k: int = 5, on_stage=None, mode: str = "r
         "verified": len(verified_ids), "unverified": len(verification["unverified"]), "unmatched": unmatched,
     })
 
+    timings = {
+        "retrieval_s": round(retrieval_s, 3),
+        "generation_s": round(generation_s, 3),
+        "total_s": round(time.perf_counter() - started, 3),
+        "prompt_chars": len(SYSTEM_PROMPT) + len(user_content),
+    }
+    logger.info(
+        "answer timings (%s): retrieval %.2fs, generation %.2fs, total %.2fs, prompt %d chars",
+        model_label, timings["retrieval_s"], timings["generation_s"], timings["total_s"], timings["prompt_chars"],
+    )
+
     return {
+        "timings": timings,
         "raw_answer": raw_with_tokens,
         "answer_markdown": answer_markdown,
         "citations": list(sources.values()),
@@ -283,6 +364,9 @@ def answer_question(question: str, top_k: int = 5, on_stage=None, mode: str = "r
         "extracted_evidence": evidence_list,
         "validated_ids": list(sources),
         "mode": mode,
+        "retrieval_plan": retrieval_plan,
+        "user_content": user_content,
+        "generation": llm_result.get("generation"),
         **verification,
     }
 

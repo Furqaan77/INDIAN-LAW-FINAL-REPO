@@ -1,6 +1,6 @@
 import { BookMarked, RotateCcw, X } from "lucide-react";
 import { motion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CopyButton } from "../components/CopyButton";
 import { Drawer } from "../components/Drawer";
@@ -8,29 +8,77 @@ import { EvidenceRail, EvidenceRailPlaceholder } from "../components/evidence/Ev
 import { Button, IconButton, StatePanel } from "../components/primitives";
 import { AnswerView } from "../components/research/AnswerView";
 import { CommandBar } from "../components/research/CommandBar";
+import { CompareColumns } from "../components/research/CompareView";
+import { EngineAnswerHeader, EngineComparison, EngineSelector, ModelDetails } from "../components/research/EngineControls";
 import { ResearchProgress } from "../components/research/ResearchProgress";
 import { VerificationNote } from "../components/research/VerificationNote";
 import { useHotkey } from "../hooks/useHotkey";
 import { BREAKPOINTS, useMediaQuery } from "../hooks/useMediaQuery";
 import { formatCitation } from "../lib/citation";
+import { DEFAULT_ENGINES, normalizeEngines, parseEnginesParam, saveEngineSelection } from "../lib/engines";
 import { relativeTime } from "../lib/format";
-import { useResearchSession, type ResearchSnapshot } from "../lib/researchSessions";
-import type { ResearchMode, ResearchResult } from "../types";
+import { history } from "../lib/history";
+import { ensureRuns, rerunEngine, useEngineRuns, useResearchSession, type ResearchSnapshot } from "../lib/researchSessions";
+import type { EngineKey, ResearchMode, ResearchResult } from "../types";
+
+/** Engines for this research: the `engines` URL parameter, the older single `engine` parameter, or those saved in history. */
+function useSelectedEngines(id: string, params: URLSearchParams): EngineKey[] {
+  const enginesParam = params.get("engines");
+  const engineParam = params.get("engine");
+  return useMemo(() => {
+    const fromList = parseEnginesParam(enginesParam);
+    if (fromList.length) return fromList;
+    const single = normalizeEngines(engineParam ? [engineParam] : []);
+    if (single.length) return single;
+    const saved = normalizeEngines(Object.keys(history.get(id)?.engines ?? {}));
+    return saved.length ? saved : DEFAULT_ENGINES;
+  }, [id, enginesParam, engineParam]);
+}
 
 export function ResearchPage() {
   const { id = "" } = useParams();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const question = params.get("q");
   const mode: ResearchMode = params.get("mode") === "quick" ? "quick" : "research";
-  const { snapshot, retry } = useResearchSession(id, question, mode);
+  const selected = useSelectedEngines(id, params);
+  const selectedKey = selected.join(",");
+  const primary = selected[0];
+  const { snapshot, retry } = useResearchSession(id, question, mode, primary);
+  const runs = useEngineRuns(id);
+  const comparing = selected.length > 1;
   const isDesktop = useMediaQuery(BREAKPOINTS.lg);
   const [activeNumber, setActiveNumber] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  const knownQuestion = question ?? snapshot?.question ?? null;
+  const knownMode = snapshot?.mode ?? mode;
+
   useEffect(() => {
     setActiveNumber(null);
     setSheetOpen(false);
-  }, [id]);
+  }, [id, primary]);
+
+  // Every selected engine answers, one after another, from the evidence frozen by the first run.
+  useEffect(() => {
+    if (knownQuestion && selected.length > 1) void ensureRuns(id, knownQuestion, knownMode, selected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, knownQuestion, knownMode, selectedKey]);
+
+  const changeEngines = useCallback(
+    (next: EngineKey[]) => {
+      saveEngineSelection(next);
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          updated.delete("engine");
+          updated.set("engines", next.join(","));
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
 
   useEffect(() => {
     if (snapshot?.question) document.title = `${snapshot.question} — IndianLawGPT`;
@@ -63,6 +111,34 @@ export function ResearchPage() {
     );
   }
 
+  const anotherQuestion = (
+    <section aria-label="Research another question" className="mt-16">
+      <p className="eyebrow mb-3">Research another question</p>
+      <CommandBar variant="compact" modes={["research", "quick"]} initialMode={mode} initialEngines={selected} />
+    </section>
+  );
+
+  if (comparing) {
+    const anyDone = selected.some((key) => runs[key]?.phase === "complete" || runs[key]?.phase === "failed");
+    return (
+      <div className="min-w-0 px-5 pt-9 pb-24 sm:px-8 lg:px-10 lg:pt-12">
+        <div className="mx-auto max-w-[1560px]">
+          <div className="max-w-[62rem]">
+            <QuestionHeader snapshot={snapshot} />
+            <EngineSelector selected={selected} runs={runs} onChange={changeEngines} />
+          </div>
+          <EngineComparison runs={runs} selected={selected} />
+          <CompareColumns
+            selected={selected}
+            runs={runs}
+            onRetry={(engine) => knownQuestion && rerunEngine(id, engine, knownQuestion, knownMode)}
+          />
+          {anyDone && <div className="max-w-[50rem]">{anotherQuestion}</div>}
+        </div>
+      </div>
+    );
+  }
+
   const result = snapshot.phase === "complete" ? snapshot.result : null;
   const running = snapshot.phase === "running";
 
@@ -71,6 +147,7 @@ export function ResearchPage() {
       <div className="min-w-0 px-5 pt-9 pb-24 sm:px-10 lg:px-14 lg:pt-12">
         <div className="mx-auto max-w-[44rem]">
           <QuestionHeader snapshot={snapshot} />
+          <EngineSelector selected={selected} runs={runs} onChange={changeEngines} />
 
           <div className="mt-10">
             {running && <ResearchProgress stages={snapshot.stages} startedAt={snapshot.startedAt} running />}
@@ -78,7 +155,7 @@ export function ResearchPage() {
             {snapshot.phase === "failed" && (
               <StatePanel
                 tone="error"
-                title="The research couldn’t be completed"
+                title={snapshot.result?.error === "generation" && snapshot.result.engine ? "Engine unavailable" : "The research couldn’t be completed"}
                 action={
                   <Button variant="primary" onClick={retry}>
                     <RotateCcw aria-hidden size={15} />
@@ -87,6 +164,12 @@ export function ResearchPage() {
                 }
               >
                 {snapshot.error ?? "Something went wrong while researching this question."}
+                {snapshot.result?.error === "generation" && snapshot.result.engine && (
+                  <span className="mt-2 block text-[13.5px]">
+                    No other model was used — IndianLawGPT never falls back to a different engine. Select another engine above
+                    to answer from the same evidence.
+                  </span>
+                )}
               </StatePanel>
             )}
 
@@ -96,6 +179,7 @@ export function ResearchPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
+                <EngineAnswerHeader result={result} />
                 <AnswerView
                   markdown={result.answer_markdown}
                   citations={result.citations}
@@ -105,17 +189,13 @@ export function ResearchPage() {
                 <div className="mt-12 border-t border-rule pt-5">
                   <VerificationNote result={result} />
                 </div>
+                <ModelDetails result={result} />
                 <AnswerActions result={result} />
               </motion.div>
             )}
           </div>
 
-          {result && (
-            <section aria-label="Research another question" className="mt-16">
-              <p className="eyebrow mb-3">Research another question</p>
-              <CommandBar variant="compact" modes={["research", "quick"]} initialMode={mode} />
-            </section>
-          )}
+          {result && anotherQuestion}
         </div>
       </div>
 
@@ -197,7 +277,7 @@ function AnswerActions({ result }: { result: ResearchResult }) {
   return (
     <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
       <CopyButton text={plainText} label="Copy analysis with sources" showLabel className="-ml-2" />
-      <span className="ml-auto font-mono text-[11px] text-ink-4">{result.models.llm}</span>
+      <span className="ml-auto font-mono text-[11px] text-ink-4">{result.engine?.subtitle ?? result.models.llm}</span>
     </div>
   );
 }

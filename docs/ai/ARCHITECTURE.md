@@ -95,9 +95,12 @@ flowchart TD
 6. **Kanoon API dependency removed**: `kanoon_client.py` and `fetch_judgments.py` are deleted.
    PDFs you provide are now the primary data source; the existing 194 scraped judgments remain
    as valid case-law data, ingested via the same JSON path as before.
-7. **Reranking / context selection**: `rerank.py` combines semantic score with a lightweight
-   lexical-overlap signal and caps chunks-per-document, so retrieval doesn't hand the LLM
-   several chunks from one document at the expense of diversity.
+7. **Reranking / context selection**: `rerank.py` fuses the rankings of four retrievers —
+   semantic chunks, keyword/BM25 documents, explicit legal references ("Section 140 of the NI
+   Act", "IPC 420") and their old/new-code counterparts from stored `corresponds_to` data
+   (`legal_references.py`) — by Reciprocal Rank Fusion (k = `RRF_K`, 60), then takes at most
+   `MAX_CHUNKS_PER_DOCUMENT` (1) chunk per document. The previous 0.75 × semantic + 0.25 ×
+   word-overlap scoring remains available as `RERANK_STRATEGY=weighted`.
 8. **Improved hybrid retrieval**: keyword-only hits previously carried empty `text` and could
    never actually be cited (a latent gap in V2) — they now pull the document's stored
    `full_text` so a keyword match contributes real, citable content.
@@ -120,7 +123,8 @@ flowchart TD
 - `src/vector_store.py`: Chroma vector store (swappable).
 - `src/llm_provider.py`: Anthropic Claude provider (swappable).
 - `src/search.py`: Hybrid retrieval (vector store + SQLite FTS5), no UI framework dependency.
-- `src/rerank.py`: Context selection / reranking pass between retrieval and prompt assembly.
+- `src/legal_references.py`: Deterministic lookup of explicit statute references in a query and their mapped old/new counterparts.
+- `src/rerank.py`: Context selection — Reciprocal Rank Fusion of the retrievers' rankings, one chunk per document.
 - `src/rag_chain.py`: Orchestrates retrieval, prompt assembly, LLM call, deterministic citation mapping.
 - `src/citation_verifier.py`: Parses `[SOURCE: doc_id]` tokens, verifies each against SQLite.
 - `src/evaluate_rag.py`: Evaluation harness over `data/eval/eval_questions.json`.

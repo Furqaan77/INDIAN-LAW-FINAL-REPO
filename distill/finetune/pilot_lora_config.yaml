@@ -1,0 +1,26 @@
+# IndianLawGPT — Qwen3-1.7B LoRA Distillation Pilot (pre-registered before training)
+# Evaluated adapter: the FINAL weights after `iters` (2 passes over 30 examples). The 1-pass checkpoint
+# (step 30) is saved for reference only and is not used to pick results.
+model: distill/finetune/models/Qwen3-1.7B-4bit    # mlx-community/Qwen3-1.7B-4bit, 4-bit quantized base
+train: true
+data: distill/finetune/data_pilot_lora             # train.jsonl (30) / valid.jsonl (3), MLX chat format
+adapter_path: artifacts/lora_demo_qwen3_1.7b
+fine_tune_type: lora
+seed: 42
+num_layers: 16             # LoRA on the last 16 of 28 transformer blocks
+lora_parameters:
+  rank: 8
+  scale: 20.0              # MLX LoRA scale (the alpha/rank multiplier)
+  dropout: 0.0
+  # keys omitted: MLX adapts every linear module in those blocks (q/k/v/o_proj, gate/up/down_proj)
+batch_size: 1
+grad_accumulation_steps: 1
+iters: 60                  # 2 epochs over 30 examples
+learning_rate: 1.0e-4
+max_seq_length: 3072
+mask_prompt: true          # loss only on the teacher's structured answer, not on the evidence prompt
+grad_checkpoint: true
+steps_per_report: 5
+steps_per_eval: 30
+val_batches: 3
+save_every: 30

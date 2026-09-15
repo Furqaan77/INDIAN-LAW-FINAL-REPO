@@ -1,10 +1,10 @@
 """
 LLM provider abstraction for answer generation.
 
-Swap providers via LLM_PROVIDER in .env. Only "anthropic" is implemented
-today; add a new class + branch in get_llm_provider() to support another
-provider without touching rag_chain.py, which only depends on the
-LLMProvider interface below.
+Swap providers via LLM_PROVIDER in .env: "anthropic" (Claude) or "ollama"
+(a local model such as qwen3:1.7b). Add a new class + branch in
+get_llm_provider() to support another provider without touching
+rag_chain.py, which only depends on the LLMProvider interface below.
 
 Client pattern mirrors the sibling Health Coach AI project:
 `langchain_anthropic.ChatAnthropic(model=..., max_tokens=..., timeout=...)`,
@@ -153,11 +153,34 @@ def _coerce_citations(value: Any) -> List[Any]:
     return salvaged
 
 
+def _json_string_field(text: str, field: str) -> str:
+    """Reads the string value of `"field": "..."` wherever it appears in malformed JSON — before or after other
+    fields, with escaped quotes, or cut off at the end of a truncated reply — and decodes its escapes."""
+    match = re.search(rf'"{field}"\s*:\s*"', text or "")
+    if not match:
+        return ""
+    index, chunks = match.end(), []
+    while index < len(text):
+        char = text[index]
+        if char == "\\" and index + 1 < len(text):
+            chunks.append(text[index:index + 2])
+            index += 2
+            continue
+        if char == '"':
+            break
+        chunks.append(char)
+        index += 1
+    raw = "".join(chunks).rstrip("\\")
+    try:
+        return json.loads(f'"{raw}"', strict=False)
+    except ValueError:
+        return raw.replace("\\n", "\n").replace('\\"', '"')
+
+
 def _salvage_partial_json(text: str) -> Dict[str, Any]:
     """A truncated or malformed response breaks json.loads for the whole object; recover the
     answer and each individually parseable citation instead of dropping all of them."""
-    answer_match = _ANSWER_FIELD_PATTERN.search(text)
-    answer = answer_match.group(1) if answer_match else ""
+    answer = _json_string_field(text, "answer")
 
     citations = []
     for m in _CITATION_OBJECT_PATTERN.finditer(text):
@@ -202,10 +225,70 @@ def _sanitize_citations(raw_citations: Any) -> list:
     return citations
 
 
+OUTPUT_VALID, OUTPUT_MALFORMED, OUTPUT_TRUNCATED, OUTPUT_FAILED = "VALID", "MALFORMED", "TRUNCATED", "FAILED"
+
+
+def validate_structured_output(text: str) -> str:
+    """Strict check of a model's raw output against the answer contract: the whole object must parse as
+    JSON with a citations list and a non-empty answer string. The salvage helpers above may still recover
+    parts of an invalid output for display, but such an output is never reported as VALID."""
+    content = re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL).strip()
+    start, end = content.find("{"), content.rfind("}")
+    if start < 0 or end <= start:
+        return OUTPUT_MALFORMED
+    try:
+        obj = json.loads(content[start:end + 1])
+    except ValueError:
+        return OUTPUT_MALFORMED
+    if not isinstance(obj, dict) or not isinstance(obj.get("citations"), list) or not str(obj.get("answer") or "").strip():
+        return OUTPUT_MALFORMED
+    return OUTPUT_VALID
+
+
+_TRAILING_TOOL_MARKUP = re.compile(r"(?:\s*</(?:answer|parameter|invoke|antml:invoke|function_calls)>)+\s*$")
+
+
+def _strip_tool_markup(answer: str) -> str:
+    """Removes tool-call closing tags (</answer>, </parameter>, </invoke>) the model sometimes leaves at the end
+    of the answer argument when its tool call is malformed."""
+    return _TRAILING_TOOL_MARKUP.sub("", answer) if isinstance(answer, str) else answer
+
+
+_PACKED_ANSWER = re.compile(r'<parameter name="answer">(.*?)(?:</parameter>|</answer>|</invoke>|$)', re.DOTALL)
+
+
+def _unpack_tool_arguments(parsed: Any) -> Dict[str, Any]:
+    """Claude occasionally writes the entire submit_legal_answer call into the citations string —
+    `<parameter name="citations">[...]` followed by `<parameter name="answer">...` — leaving the real answer
+    argument empty. Returns {"answer", "citations"} recovered from that string, or {} if it isn't that shape."""
+    if not isinstance(parsed, dict) or str(parsed.get("answer") or "").strip():
+        return {}
+    value = parsed.get("citations")
+    if not isinstance(value, str):
+        return {}
+    match = _PACKED_ANSWER.search(value)
+    if not match or not match.group(1).strip():
+        return {}
+    answer, embedded = _recover_embedded_citations(html.unescape(match.group(1)).strip())
+    citations = _sanitize_citations(_coerce_citations(value[:match.start()]) or embedded)
+    return {"answer": answer, "citations": citations}
+
+
+def _parse_json_answer(content: str) -> Dict[str, Any]:
+    parsed = _extract_json_object(content)
+    if not parsed:
+        return {"answer": content.strip(), "citations": []}
+    answer, embedded = _recover_embedded_citations(str(parsed.get("answer") or ""))
+    citations = _coerce_citations(parsed.get("citations")) or embedded
+    return {"answer": answer, "citations": _sanitize_citations(citations)}
+
+
 class LLMProvider(abc.ABC):
     @abc.abstractmethod
     def generate_structured_answer(self, system_prompt: str, user_content: str) -> Dict[str, Any]:
-        """Returns {"answer": str, "citations": [{"doc_id", "evidence_quote"}, ...]}."""
+        """Returns {"answer": str, "citations": [{"doc_id", "evidence_quote"}, ...], "generation": {...}}.
+        `generation` (output_status, raw_output, token counts, finish_reason) is telemetry for the answer
+        engines; callers that only read answer and citations are unaffected."""
 
 
 class AnthropicProvider(LLMProvider):
@@ -235,8 +318,14 @@ class AnthropicProvider(LLMProvider):
             raise
 
         parsed = response.get("parsed")
+        raw_message = response.get("raw")
+        usage = getattr(raw_message, "usage_metadata", None) or {}
+        stop_reason = (getattr(raw_message, "response_metadata", None) or {}).get("stop_reason")
+        generation = {
+            "input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens"), "finish_reason": stop_reason,
+        }
         if isinstance(parsed, dict) and parsed.get("answer"):
-            answer, embedded = _recover_embedded_citations(parsed["answer"])
+            answer, embedded = _recover_embedded_citations(_strip_tool_markup(parsed["answer"]))
             citations = _coerce_citations(parsed.get("citations")) or embedded
             if embedded and citations is embedded:
                 logger.info("Recovered %d citation(s) the model wrote inside the answer text", len(embedded))
@@ -247,17 +336,154 @@ class AnthropicProvider(LLMProvider):
                     "Answer returned without usable citations (citations type=%s, preview=%r)",
                     type(raw_value).__name__, repr(raw_value)[:200],
                 )
-            return {"answer": answer, "citations": sanitized}
+            generation.update({
+                "output_status": OUTPUT_TRUNCATED if stop_reason == "max_tokens"
+                else OUTPUT_VALID if isinstance(parsed.get("citations"), list) else OUTPUT_MALFORMED,
+                "raw_output": json.dumps({"citations": parsed.get("citations"), "answer": parsed.get("answer")}, ensure_ascii=False, default=str),
+            })
+            return {"answer": answer, "citations": sanitized, "generation": generation}
+
+        malformed = OUTPUT_TRUNCATED if stop_reason == "max_tokens" else OUTPUT_MALFORMED
+        packed = _unpack_tool_arguments(parsed)
+        if packed:
+            # The model wrote the whole tool call into the citations string; recover it, but never as VALID.
+            logger.warning("Recovered answer and %d citation(s) packed inside the citations string", len(packed["citations"]))
+            generation.update({"output_status": malformed, "raw_output": json.dumps(parsed, ensure_ascii=False, default=str)})
+            return {**packed, "generation": generation}
 
         logger.warning(
-            "Structured answer missing or empty (parsing_error=%s); falling back to text parsing",
+            "Structured answer missing or empty (parsing_error=%s, parsed fields=%s, tool_calls=%d, content blocks=%s, stop=%s); "
+            "falling back to text parsing",
             response.get("parsing_error"),
+            {k: type(v).__name__ for k, v in parsed.items()} if isinstance(parsed, dict) else type(parsed).__name__,
+            len(getattr(raw_message, "tool_calls", None) or []),
+            [b.get("type") for b in raw_message.content if isinstance(b, dict)] if isinstance(getattr(raw_message, "content", None), list) else type(getattr(raw_message, "content", None)).__name__,
+            stop_reason,
         )
         raw_text = _message_text(getattr(response.get("raw"), "content", ""))
+        generation.update({"output_status": malformed, "raw_output": raw_text})
         fallback = _extract_json_object(raw_text)
         if not fallback:
-            return {"answer": raw_text.strip(), "citations": []}
-        return {"answer": fallback.get("answer", "") or "", "citations": _sanitize_citations(fallback.get("citations"))}
+            return {"answer": raw_text.strip(), "citations": [], "generation": generation}
+        return {"answer": fallback.get("answer", "") or "", "citations": _sanitize_citations(fallback.get("citations")), "generation": generation}
+
+
+class OllamaProvider(LLMProvider):
+    """A local model served by Ollama's HTTP API, called with the standard library (no extra
+    dependency). Thinking is disabled for latency, and the same schema as the Claude tool is
+    passed as Ollama's `format`, so the output contract matches AnthropicProvider exactly."""
+
+    def __init__(self):
+        self.model = settings.ollama_model
+        self.url = f"{settings.ollama_base_url.rstrip('/')}/api/chat"
+        self.last_metrics: Dict[str, Any] = {}
+
+    def generate_structured_answer(self, system_prompt: str, user_content: str) -> Dict[str, Any]:
+        import urllib.error
+        import urllib.request
+
+        body = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            "stream": False,
+            "think": False,
+            "format": ANSWER_TOOL["input_schema"],
+            "keep_alive": settings.ollama_keep_alive,
+            "options": {
+                "temperature": 0,
+                "num_ctx": settings.ollama_num_ctx,
+                "num_predict": settings.ollama_max_tokens,
+            },
+        }
+        request = urllib.request.Request(
+            self.url, data=json.dumps(body).encode("utf-8"), headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=settings.ollama_timeout) as response:
+                payload = json.load(response)
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", "replace")[:300]
+            logger.error("Ollama returned HTTP %s (model=%s): %s", error.code, self.model, detail)
+            raise RuntimeError(f"Ollama returned HTTP {error.code} for model '{self.model}': {detail}") from error
+        except (urllib.error.URLError, TimeoutError) as error:
+            logger.error("Could not reach Ollama at %s: %s", self.url, error)
+            raise RuntimeError(f"Could not reach Ollama at {settings.ollama_base_url} — is `ollama serve` running?") from error
+
+        self.last_metrics = {
+            "load_s": payload.get("load_duration", 0) / 1e9,
+            "prompt_tokens": payload.get("prompt_eval_count"),
+            "prompt_eval_s": payload.get("prompt_eval_duration", 0) / 1e9,
+            "output_tokens": payload.get("eval_count"),
+            "eval_s": payload.get("eval_duration", 0) / 1e9,
+            "done_reason": payload.get("done_reason"),
+        }
+        logger.info(
+            "Ollama %s: prompt %s tok in %.2fs, output %s tok in %.2fs, load %.2fs, done=%s",
+            self.model, self.last_metrics["prompt_tokens"], self.last_metrics["prompt_eval_s"],
+            self.last_metrics["output_tokens"], self.last_metrics["eval_s"], self.last_metrics["load_s"],
+            self.last_metrics["done_reason"],
+        )
+        if payload.get("done_reason") == "length":
+            logger.warning("Ollama output hit OLLAMA_MAX_TOKENS=%d and was cut off", settings.ollama_max_tokens)
+
+        content = (payload.get("message") or {}).get("content", "")
+        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)  # defensive; thinking is disabled
+        generation = {
+            "output_status": OUTPUT_TRUNCATED if payload.get("done_reason") == "length" else validate_structured_output(content),
+            "raw_output": content, "input_tokens": payload.get("prompt_eval_count"), "output_tokens": payload.get("eval_count"),
+            "finish_reason": payload.get("done_reason"),
+        }
+        if not _extract_json_object(content):
+            logger.warning("Ollama returned no parseable JSON; treating the output as plain text")
+        return {**_parse_json_answer(content), "generation": generation}
+
+
+class LoRAQwenProvider(LLMProvider):
+    """EXPERIMENTAL: Qwen3-1.7B with a LoRA adapter, served by the local MLX service
+    (distill/finetune/lora_server.py). The service reports which adapter it loaded, and every response is
+    checked against LORA_ADAPTER_NAME — a service serving another adapter, or none, is refused, so this
+    engine can never silently answer with the base model."""
+
+    def __init__(self):
+        self.url = settings.lora_qwen_url.rstrip("/")
+        self.adapter_name = settings.lora_adapter_name
+
+    def _request(self, path: str, body: Dict[str, Any] = None, timeout: int = None) -> Dict[str, Any]:
+        import urllib.error
+        import urllib.request
+
+        data = json.dumps(body).encode("utf-8") if body is not None else None
+        request = urllib.request.Request(f"{self.url}{path}", data=data, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(request, timeout=timeout or settings.lora_timeout) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", "replace")[:300]
+            raise RuntimeError(f"LoRA Qwen service returned HTTP {error.code}: {detail}") from error
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            raise RuntimeError(f"Could not reach the LoRA Qwen service at {self.url}: {error}") from error
+
+    def health(self, timeout: int = 3) -> Dict[str, Any]:
+        return self._request("/health", timeout=timeout)
+
+    def generate_structured_answer(self, system_prompt: str, user_content: str) -> Dict[str, Any]:
+        payload = self._request("/generate", {"system": system_prompt, "user": user_content, "max_tokens": settings.lora_max_tokens})
+        if payload.get("adapter_name") != self.adapter_name:
+            raise RuntimeError(
+                f"LoRA Qwen service is serving adapter {payload.get('adapter_name')!r}, not the configured {self.adapter_name!r}"
+            )
+        content = re.sub(r"<think>.*?</think>", "", payload.get("text") or "", flags=re.DOTALL).strip()
+        generation = {
+            "output_status": OUTPUT_TRUNCATED if payload.get("finish_reason") == "length" else validate_structured_output(content),
+            "raw_output": content, "input_tokens": payload.get("prompt_tokens"), "output_tokens": payload.get("output_tokens"),
+            "finish_reason": payload.get("finish_reason"), "service_seconds": payload.get("seconds"),
+            "adapter_name": payload.get("adapter_name"), "adapter_sha256": payload.get("adapter_sha256"),
+        }
+        logger.info("LoRA Qwen (%s): %s output tokens, status %s", self.adapter_name, payload.get("output_tokens"), generation["output_status"])
+        return {**_parse_json_answer(content), "generation": generation}
 
 
 @lru_cache(maxsize=1)
@@ -266,7 +492,22 @@ def get_llm_provider() -> LLMProvider:
     if provider == "anthropic":
         logger.info("Using Anthropic LLM provider (model=%s)", settings.anthropic_model)
         return AnthropicProvider()
+    if provider == "ollama":
+        logger.info("Using Ollama LLM provider (model=%s, url=%s)", settings.ollama_model, settings.ollama_base_url)
+        return OllamaProvider()
     raise ValueError(
-        f"Unknown LLM_PROVIDER '{provider}'. Supported: 'anthropic'. "
+        f"Unknown LLM_PROVIDER '{provider}'. Supported: 'anthropic', 'ollama'. "
         "Add a new branch in llm_provider.get_llm_provider() to support more."
     )
+
+
+@lru_cache(maxsize=None)
+def get_named_provider(name: str) -> LLMProvider:
+    """A provider chosen per request by the answer engines (src/engines.py), independent of LLM_PROVIDER."""
+    if name == "anthropic":
+        return AnthropicProvider()
+    if name == "ollama":
+        return OllamaProvider()
+    if name == "lora_mlx":
+        return LoRAQwenProvider()
+    raise ValueError(f"Unknown provider '{name}'. Supported: 'anthropic', 'ollama', 'lora_mlx'.")

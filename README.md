@@ -91,6 +91,24 @@ their verified source passages; the document reader, statute/case search and the
 (IPC↔BNS, CrPC↔BNSS, IEA↔BSA, Income-tax 1961↔2025) are separate endpoints. Research history is kept in
 the browser. `frontend/qa/visual-qa.mjs` is a Playwright script that screenshots every screen for review.
 
+## Demo (research prototype)
+
+The question box has three answer-engine toggles — **Claude API** (Claude + IndianLawGPT RAG), **Plain Qwen**
+(Qwen3 1.7B via Ollama + RAG) and **LoRA Qwen** (experimental fine-tuned Qwen3 1.7B via a local MLX service + RAG).
+Choose one, two or all three: selected engines answer side by side from the **same frozen evidence**, with no fallback
+between them. Every answer shows its evidence, the quotations the verifier matched or rejected, and model details.
+
+```bash
+ollama serve                                                    # Plain Qwen (ollama pull qwen3:1.7b once)
+distill/finetune/.venv/bin/python distill/finetune/lora_server.py \
+    --adapter artifacts/lora_demo_qwen3_1.7b --adapter-name lora_demo_qwen3_1.7b --port 8095   # LoRA Qwen
+cd src && ../.venv/bin/uvicorn api:app --port 8010              # API
+cd frontend && npm run dev -- --port 5174 --strictPort          # open http://localhost:5174
+.venv/bin/python distill/diagnostics/demo_smoke_test.py         # optional pre-flight check
+```
+
+Full guide: [docs/DEMO.md](docs/DEMO.md). Engine integration details: [docs/LOQA_QWEN_RAG_INTEGRATION.md](docs/LOQA_QWEN_RAG_INTEGRATION.md).
+
 *Note: the vector store must be rebuilt after switching embedding providers/models — vectors
 from different models aren't comparable, so `chunk_embed.py` / `ingest_pdf.py` need to be
 re-run whenever `EMBEDDING_MODEL` changes.*

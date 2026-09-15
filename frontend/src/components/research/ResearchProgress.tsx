@@ -74,8 +74,17 @@ export function ResearchProgress({ stages, startedAt, running }: ResearchProgres
       <ol className="mt-6 space-y-0.5">
         {STEPS.map((step, index) => {
           const event = stages[step.id];
-          const status = event?.status ?? "pending";
-          const summary = status === "done" && event ? step.summary(event.detail) : null;
+          // Another engine already answered this question: its frozen evidence is reused, nothing is searched again.
+          const reusedSearch = !event && Boolean((stages.ranking?.detail as Record<string, unknown> | undefined)?.reused)
+            && (step.id === "semantic" || step.id === "keyword");
+          const status = reusedSearch ? "done" : (event?.status ?? "pending");
+          const summary = reusedSearch
+            ? "Reused the evidence already retrieved for this question — not searched again"
+            : status === "done" && event
+              ? step.id === "ranking" && (event.detail as Record<string, unknown>).reused
+                ? "Same evidence as the other answer engines"
+                : step.summary(event.detail)
+              : null;
           return (
             <motion.li
               key={step.id}

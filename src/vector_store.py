@@ -78,7 +78,9 @@ class ChromaVectorStore:
         self, query_text: str, top_k: int = 10, where: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         try:
-            results = self.collection.query(query_texts=[query_text], n_results=top_k, where=where)
+            results = self.collection.query(
+                query_embeddings=[list(_query_embedding(query_text))], n_results=top_k, where=where,
+            )
         except Exception:
             logger.exception("Vector store query failed")
             raise
@@ -92,6 +94,13 @@ class ChromaVectorStore:
         for doc, meta, dist in zip(docs[0], metas[0], dists[0]):
             hits.append({"text": doc, "metadata": meta, "score": 1 - dist})
         return hits
+
+
+@lru_cache(maxsize=256)
+def _query_embedding(query_text: str) -> tuple:
+    """One embedding request per distinct query text: hybrid retrieval queries the collection several
+    times for the same question (candidate search, then per-document passage lookup)."""
+    return tuple(get_embedding_function().embed_query([query_text])[0])
 
 
 @lru_cache(maxsize=1)

@@ -39,6 +39,18 @@ logs/
 # Model caching
 .huggingface/
 
+# Model weights, LoRA adapters and training artifacts (large binaries; reproducible, never committed)
+artifacts/
+distill/finetune/models/
+distill/finetune/adapters/
+*.safetensors
+*.gguf
+
+# Distillation datasets, eval outputs and per-request engine telemetry (local research data)
+data/distill/
+data/telemetry/
+distill/finetune/eval/
+
 # Development / Testing / Evaluation folders (Local Historical Only)
 tools/
 evaluation/

@@ -49,12 +49,74 @@ export interface Citation extends ChunkLocation {
 }
 
 export interface RetrievedDocument extends ChunkLocation {
-  source: "semantic" | "keyword";
+  source: string;
   score: number | null;
   rerank_score: number | null;
   excerpt: string;
   cited: boolean;
   document: DocumentSummary | null;
+  /** Rank of this source in each retriever that found it: semantic, keyword, reference, mapping, subquery_semantic. */
+  retrieval_ranks?: Record<string, number> | null;
+  /** Why the source was reserved: explicit_reference, mapped_counterpart or case_law_authority. */
+  required_reason?: string | null;
+  chunk_id?: string | null;
+}
+
+export interface CitationCheck {
+  proposed: number;
+  matched: number;
+  rejected: number;
+  rejected_quotes: { doc_id: string | null; quote: string }[];
+  sources: number;
+  sources_verified: number;
+  sources_unverified: number;
+}
+
+/** Answer engines: the same RAG evidence, a different answer model. */
+export type EngineKey = "claude" | "lora_qwen" | "qwen";
+
+export type OutputStatus = "VALID" | "MALFORMED" | "TRUNCATED" | "FAILED";
+
+export interface EngineRun {
+  key: EngineKey;
+  label: string;
+  subtitle: string;
+  model: string;
+  description?: string;
+  role?: string;
+  runtime?: string;
+  provider: string;
+  adapter: string | null;
+  adapter_label: string | null;
+  experimental: boolean;
+  rag: boolean;
+  evidence_id?: string | null;
+  evidence_reused?: boolean;
+  retrieved_sources?: number;
+  retrieval_s?: number;
+  generation_s?: number | null;
+  total_s?: number | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  citation_count?: number;
+  verified_citations?: number;
+  unverified_citations?: number;
+  retry_count: number;
+  /** Which attempt's answer is shown (1-based). */
+  used_attempt?: number | null;
+  /** The reply was malformed, but its answer text was recovered from it. */
+  answer_recovered?: boolean;
+  /** Nothing could be parsed; the model's raw output is shown instead. */
+  raw_output_shown?: boolean;
+  output_status: OutputStatus;
+  first_output_status?: OutputStatus;
+  error?: string | null;
+  message?: string | null;
+}
+
+export interface EngineStatus extends EngineRun {
+  available: boolean;
+  detail: string;
 }
 
 export interface ResearchResult {
@@ -69,6 +131,11 @@ export interface ResearchResult {
   accuracy_note: string | null;
   error: "retrieval" | "generation" | null;
   models: { llm: string; embedding: string };
+  /** Present when the answer came from a selected engine (absent in older history entries). */
+  engine?: EngineRun | null;
+  evidence?: { evidence_id: string | null; reused: boolean; doc_ids: string[] } | null;
+  /** Absent in history entries saved before the demo build. */
+  citation_check?: CitationCheck | null;
   completed_at: number;
 }
 

@@ -2,6 +2,8 @@ import type {
   ActSections,
   CorpusStats,
   DocumentDetail,
+  EngineKey,
+  EngineStatus,
   LawMapResponse,
   MappedAct,
   ResearchMode,
@@ -62,6 +64,8 @@ export const api = {
 
   lawMap: (act: string, section: string, signal?: AbortSignal) =>
     getJson<LawMapResponse>(`/api/law-map?${new URLSearchParams({ act, section })}`, signal),
+
+  engines: (signal?: AbortSignal) => getJson<{ engines: EngineStatus[] }>("/api/engines", signal),
 };
 
 interface ResearchHandlers {
@@ -85,19 +89,26 @@ function dispatchEvent(raw: string, handlers: ResearchHandlers) {
   else if (event === "error") handlers.onError(payload.message ?? "The research pipeline failed.");
 }
 
+export interface EngineOptions {
+  engine?: EngineKey;
+  /** Frozen evidence from an earlier answer, so this engine answers from the identical evidence. */
+  evidenceId?: string | null;
+}
+
 /** POSTs a research question and consumes the Server-Sent Event stream it returns. */
 export async function streamResearch(
   question: string,
   mode: ResearchMode,
   handlers: ResearchHandlers,
   signal: AbortSignal,
+  options: EngineOptions = {},
 ): Promise<void> {
   let response: Response;
   try {
     response = await fetch("/api/research", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-      body: JSON.stringify({ question, mode }),
+      body: JSON.stringify({ question, mode, engine: options.engine, evidence_id: options.evidenceId ?? undefined }),
       signal,
     });
   } catch (error) {

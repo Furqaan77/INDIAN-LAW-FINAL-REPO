@@ -70,6 +70,15 @@ export function SourceSlip({ citation, active, onActivate }: SourceSlipProps) {
             {[heading.secondary, heading.locator].filter(Boolean).join(" · ")}
           </p>
         )}
+        <p className="mt-1 font-mono text-[10.5px] break-all text-ink-4">
+          {[
+            citation.doc_id,
+            citation.page_start ? (citation.page_end && citation.page_end !== citation.page_start ? `pp. ${citation.page_start}–${citation.page_end}` : `p. ${citation.page_start}`) : null,
+            citation.verified ? "verified in database" : "not verified",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
       </div>
 
       <div className="border-t border-rule px-4 py-3">

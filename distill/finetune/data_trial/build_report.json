@@ -1,0 +1,56 @@
+{
+  "run": "pilot_v2",
+  "max_tokens": 4096,
+  "train": {
+    "examples": 30,
+    "dropped_over_length": 2,
+    "tokens_mean": 2547,
+    "tokens_max": 3443,
+    "categories": {
+      "fact_pattern": 3,
+      "applicability": 3,
+      "definition": 3,
+      "old_new_law": 3,
+      "case_law": 1,
+      "procedural": 4,
+      "section_identification": 4,
+      "interpretation": 2,
+      "multiple_sections": 1,
+      "exception": 3,
+      "statute_comparison": 1,
+      "punishment": 3,
+      "insufficient_evidence": 1
+    }
+  },
+  "valid": {
+    "examples": 4,
+    "dropped_over_length": 0,
+    "tokens_mean": 2552,
+    "tokens_max": 2773,
+    "categories": {
+      "insufficient_evidence": 1,
+      "statute_comparison": 1,
+      "applicability": 1,
+      "section_identification": 1
+    }
+  },
+  "test": {
+    "examples": 4,
+    "dropped_over_length": 0,
+    "tokens_mean": 3002,
+    "tokens_max": 3731,
+    "categories": {
+      "old_new_law": 1,
+      "multiple_sections": 1,
+      "fact_pattern": 1,
+      "statute_comparison": 1
+    }
+  },
+  "eval": {
+    "items": 4,
+    "by_run": {
+      "pilot_v2": 4
+    },
+    "prompts_also_in_train": 0
+  }
+}

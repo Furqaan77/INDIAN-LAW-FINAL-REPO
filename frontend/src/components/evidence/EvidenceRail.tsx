@@ -25,14 +25,15 @@ export function EvidenceRail({ result, activeNumber, onSelect, headerAction }: E
     slipRefs.current.get(activeNumber)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "nearest" });
   }, [activeNumber]);
 
-  const uncited = useMemo(() => {
+  const retrieved = useMemo(() => {
     const seen = new Set<string>();
     return result.retrieved_documents.filter((document) => {
-      if (document.cited || seen.has(document.doc_id)) return false;
+      if (seen.has(document.doc_id)) return false;
       seen.add(document.doc_id);
       return true;
     });
   }, [result.retrieved_documents]);
+  const verifiedIds = new Set(citations.filter((citation) => citation.verified).map((citation) => citation.doc_id));
 
   const statutes = citations.filter((citation) => citation.source_type === "statute").length;
   const judgments = citations.filter((citation) => citation.source_type === "case_law").length;
@@ -73,7 +74,14 @@ export function EvidenceRail({ result, activeNumber, onSelect, headerAction }: E
             ))}
           </ol>
         )}
-        {uncited.length > 0 && <RetrievedList documents={uncited} defaultOpen={citations.length === 0} />}
+        {retrieved.length > 0 && (
+          <RetrievedList
+            documents={retrieved}
+            verifiedIds={verifiedIds}
+            evidenceId={result.evidence?.evidence_id ?? null}
+            defaultOpen={citations.length === 0}
+          />
+        )}
       </div>
     </div>
   );
@@ -89,7 +97,45 @@ function RailHeader({ children, action }: { children?: ReactNode; action?: React
   );
 }
 
-function RetrievedList({ documents, defaultOpen }: { documents: RetrievedDocument[]; defaultOpen: boolean }) {
+const RETRIEVER_LABEL: Record<string, string> = {
+  semantic: "semantic",
+  keyword: "keyword",
+  reference: "legal reference",
+  mapping: "old/new-law map",
+  subquery_semantic: "case-law search",
+};
+
+const REASON_LABEL: Record<string, string> = {
+  explicit_reference: "Named in the question",
+  mapped_counterpart: "Old/new-law counterpart",
+  case_law_authority: "Case-law authority",
+};
+
+export function pageLabel(start: number | null | undefined, end: number | null | undefined): string | null {
+  if (!start) return null;
+  return end && end !== start ? `pp. ${start}–${end}` : `p. ${start}`;
+}
+
+function retrievalSignals(document: RetrievedDocument): string | null {
+  const ranks = document.retrieval_ranks;
+  if (!ranks || Object.keys(ranks).length === 0) return RETRIEVER_LABEL[document.source] ?? document.source ?? null;
+  return Object.entries(ranks)
+    .map(([name, rank]) => `${RETRIEVER_LABEL[name] ?? name}${typeof rank === "number" ? ` #${rank}` : ""}`)
+    .join(" · ");
+}
+
+/** Every source in the frozen evidence the engine was given — cited or not — with how it was found. */
+function RetrievedList({
+  documents,
+  verifiedIds,
+  evidenceId,
+  defaultOpen,
+}: {
+  documents: RetrievedDocument[];
+  verifiedIds: Set<string>;
+  evidenceId: string | null;
+  defaultOpen: boolean;
+}) {
   const location = useLocation();
   const state: SourceLinkState = {
     quotes: [],
@@ -101,12 +147,19 @@ function RetrievedList({ documents, defaultOpen }: { documents: RetrievedDocumen
     <details open={defaultOpen} className="group mt-6 border-t border-rule pt-4">
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-1 text-[12.5px] text-ink-3 transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
         <ChevronRight aria-hidden size={13} className="transition-transform duration-200 group-open:rotate-90" />
-        Also retrieved, not cited
+        All retrieved evidence
         <span className="text-ink-4 tabular-nums">{documents.length}</span>
+        {evidenceId && <span className="ml-auto font-mono text-[10.5px] text-ink-4">{evidenceId}</span>}
       </summary>
-      <ul className="mt-2 space-y-0.5">
-        {documents.map((document) => {
+      <p className="mt-1 px-2 text-[12px] leading-snug text-ink-4">
+        The exact passages given to the answer engine, in ranked order. Only these can be cited.
+      </p>
+      <ol className="mt-2 space-y-0.5">
+        {documents.map((document, index) => {
           const heading = describeSource(document.document, document.title);
+          const pages = pageLabel(document.page_start, document.page_end);
+          const signals = retrievalSignals(document);
+          const status = document.cited ? (verifiedIds.has(document.doc_id) ? "Cited · verified" : "Cited · not verified") : "Not cited";
           return (
             <li key={document.doc_id}>
               <Link
@@ -114,18 +167,42 @@ function RetrievedList({ documents, defaultOpen }: { documents: RetrievedDocumen
                 state={state}
                 className="flex gap-2.5 rounded-md px-2 py-2 transition-colors hover:bg-sunk"
               >
+                <span className="mt-[2px] w-4 shrink-0 text-right font-mono text-[11px] text-ink-4 tabular-nums">{index + 1}</span>
                 <span className="mt-[3px] w-3 shrink-0 text-center">
                   <SourceGlyph type={document.source_type} />
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="line-clamp-2 block text-[13.5px] leading-snug text-ink">{heading.primary}</span>
-                  {heading.secondary && <span className="mt-0.5 block truncate text-[12px] text-ink-3">{heading.secondary}</span>}
+                  {(heading.secondary || document.section) && (
+                    <span className="mt-0.5 block truncate text-[12px] text-ink-3">
+                      {[heading.secondary, heading.locator ?? (document.section && document.section !== "general" ? document.section : null)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  )}
+                  <span className="mt-1 block font-mono text-[10.5px] leading-relaxed break-all text-ink-4">
+                    {[document.doc_id, pages, signals].filter(Boolean).join(" · ")}
+                  </span>
+                  <span className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                    <span
+                      className={`rounded px-1.5 py-px ${
+                        document.cited ? (verifiedIds.has(document.doc_id) ? "bg-verify-wash text-verify" : "bg-caution-wash text-caution") : "bg-sunk text-ink-3"
+                      }`}
+                    >
+                      {status}
+                    </span>
+                    {document.required_reason && (
+                      <span className="rounded bg-statute-wash px-1.5 py-px text-statute">
+                        {REASON_LABEL[document.required_reason] ?? document.required_reason}
+                      </span>
+                    )}
+                  </span>
                 </span>
               </Link>
             </li>
           );
         })}
-      </ul>
+      </ol>
     </details>
   );
 }

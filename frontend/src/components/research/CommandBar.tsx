@@ -3,8 +3,11 @@ import type { KeyboardEvent } from "react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useHotkey } from "../../hooks/useHotkey";
+import { loadEngineSelection, saveEngineSelection } from "../../lib/engines";
 import { MODES, destinationFor, type ModeId } from "../../lib/modes";
+import type { EngineKey } from "../../types";
 import { Kbd } from "../primitives";
+import { EngineToggleGroup } from "./EngineControls";
 
 interface CommandBarProps {
   initialQuery?: string;
@@ -13,6 +16,8 @@ interface CommandBarProps {
   autoFocus?: boolean;
   /** Restrict which modes are offered (e.g. only research modes inside the workspace). */
   modes?: ModeId[];
+  /** Answer engines preselected for the next question (default: the last selection in this browser). */
+  initialEngines?: EngineKey[];
 }
 
 /** The research entry point: a query field with a mode selector, not a chat box. */
@@ -22,10 +27,12 @@ export function CommandBar({
   variant = "hero",
   autoFocus = false,
   modes,
+  initialEngines,
 }: CommandBarProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState(initialQuery);
   const [mode, setMode] = useState<ModeId>(initialMode);
+  const [engines, setEngines] = useState<EngineKey[]>(() => initialEngines ?? loadEngineSelection());
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const radioRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -56,11 +63,13 @@ export function CommandBar({
 
   function submit() {
     if (!canSubmit) return;
-    const destination = destinationFor(active.id, trimmed);
+    const answers = active.id === "research" || active.id === "quick";
+    const destination = destinationFor(active.id, trimmed, answers ? engines : undefined);
     if (!destination.ok) {
       setError(destination.message);
       return;
     }
+    if (answers) saveEngineSelection(engines);
     setError(null);
     navigate(destination.to);
   }
@@ -158,6 +167,13 @@ export function CommandBar({
             hero ? "pt-4 pb-2 text-[1.375rem] leading-[1.45] sm:text-[1.5rem]" : "pt-3 pb-1 text-[1.125rem] leading-snug"
           }`}
         />
+
+        {(active.id === "research" || active.id === "quick") && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-2">
+            <span className="text-[12px] font-medium text-ink-3">Answer with</span>
+            <EngineToggleGroup selected={engines} onChange={setEngines} size="sm" />
+          </div>
+        )}
 
         <div className="flex items-center gap-3 py-3 pr-3 pl-5">
           <p id={`${fieldId}-hint`} className="min-w-0 flex-1 truncate text-[12.5px] text-ink-3">
