@@ -1,0 +1,836 @@
+[
+ {
+  "src": "first",
+  "start": 0.0,
+  "end": 8.0,
+  "text": "Imagine having thousands of legal documents, statutes, and court judgments, but still needing to search through them every time you want to answer a legal question."
+ },
+ {
+  "src": "first",
+  "start": 8.0,
+  "end": 12.0,
+  "text": "That is the problem we set out to solve with Indian Law GPT."
+ },
+ {
+  "src": "first",
+  "start": 12.0,
+  "end": 18.0,
+  "text": "In this video, I'll explain what we built, why we built it, how it works, what we tested, and what we learned."
+ },
+ {
+  "src": "first",
+  "start": 18.0,
+  "end": 28.0,
+  "text": "We wanted to create an AI-powered legal research assistant that could help users find relevant information from Indian legal documents and generate answers grounded in that information."
+ },
+ {
+  "src": "first",
+  "start": 28.0,
+  "end": 33.0,
+  "text": "But we did not want to build just another chatbot that produces convincing sounding legal answers."
+ },
+ {
+  "src": "first",
+  "start": 33.0,
+  "end": 43.0,
+  "text": "Legal research requires finding the right provisions, identifying relevant judgments, connecting answers to their sources, and checking whether the evidence actually supports what the AI says."
+ },
+ {
+  "src": "first",
+  "start": 43.0,
+  "end": 50.0,
+  "text": "That is why our focus was on building an evidence-based research system with retrieval and citation verification at its core."
+ },
+ {
+  "src": "first",
+  "start": 50.0,
+  "end": 57.0,
+  "text": "We also wanted to experiment with adapting a smaller, locally running language model and compare its performance against other models."
+ },
+ {
+  "src": "first",
+  "start": 57.0,
+  "end": 67.0,
+  "text": "We built Indian Law GPT with four main components, a legal document collection, a retrieval system, an answer generation system, and a citation verification system."
+ },
+ {
+  "src": "first",
+  "start": 67.0,
+  "end": 76.0,
+  "text": "We also built a research interface where users can ask questions, inspect citations, open documents, and compare answers from different models."
+ },
+ {
+  "src": "first",
+  "start": 76.0,
+  "end": 90.0,
+  "text": "The foundation of the system is our legal data. According to our project report, the corpus contains 38,432 documents and 64,651 indexed passages."
+ },
+ {
+  "src": "first",
+  "start": 90.0,
+  "end": 99.0,
+  "text": "It includes 38,238 statutory sections, 832 central acts, and 194 judgments."
+ },
+ {
+  "src": "first",
+  "start": 99.0,
+  "end": 105.0,
+  "text": "We organized this information so the system could retrieve relevant passages rather than relying only on the language model's general knowledge."
+ },
+ {
+  "src": "first",
+  "start": 105.0,
+  "end": 114.0,
+  "text": "Our statutory collection is broad, while our case law collection is more focused, with particular concentration on section 138 of the Negotiable Instruments Act."
+ },
+ {
+  "src": "first",
+  "start": 114.0,
+  "end": 121.0,
+  "text": "We made this distinction because having a large collection of documents does not automatically mean that every area of Indian law is covered."
+ },
+ {
+  "src": "first",
+  "start": 121.0,
+  "end": 124.0,
+  "text": "Once we had the data, we needed a way to find the right information."
+ },
+ {
+  "src": "first",
+  "start": 124.0,
+  "end": 129.0,
+  "text": "A simple keyword search can miss relevant passages when a user asks a question using different wording."
+ },
+ {
+  "src": "first",
+  "start": 129.0,
+  "end": 138.0,
+  "text": "Semantic search can help find passages with similar meaning, but legal research also requires exact references, section numbers, and connections between older and newer laws."
+ },
+ {
+  "src": "first",
+  "start": 138.0,
+  "end": 149.0,
+  "text": "So we developed a hybrid retrieval system. It combines semantic search, keyword search using BM25, explicit legal reference matching, old law to new law mapping, and case law retrieval."
+ },
+ {
+  "src": "first",
+  "start": 149.0,
+  "end": 153.0,
+  "text": "We combine these results using a ranking method called reciprocal rank fusion."
+ },
+ {
+  "src": "first",
+  "start": 153.0,
+  "end": 160.0,
+  "text": "In simple terms, we use multiple ways to search for relevant legal information and combine their results into one ranked list."
+ },
+ {
+  "src": "first",
+  "start": 160.0,
+  "end": 166.0,
+  "text": "We did this because we wanted to improve the system's ability to find the specific sources required by a legal question."
+ },
+ {
+  "src": "first",
+  "start": 166.0,
+  "end": 174.0,
+  "text": "In one held out evaluation, the system retrieved 106 out of 112 required sources, giving a retrieval rate of 94.6%."
+ },
+ {
+  "src": "first",
+  "start": 174.0,
+  "end": 178.0,
+  "text": "This measures source retrieval on that evaluation set, not the correctness of every answer."
+ },
+ {
+  "src": "first",
+  "start": 178.0,
+  "end": 185.0,
+  "text": "Finding a relevant document is only one part of legal research. A model might produce a citation that looks correct but points to the wrong source."
+ },
+ {
+  "src": "first",
+  "start": 185.0,
+  "end": 189.0,
+  "text": "It might also provide a quotation that does not appear in the retrieved document."
+ },
+ {
+  "src": "first",
+  "start": 189.0,
+  "end": 193.0,
+  "text": "We wanted to reduce that risk so we built citation verification into the pipeline."
+ },
+ {
+  "src": "first",
+  "start": 193.0,
+  "end": 196.0,
+  "text": "The model proposes quotations as supporting evidence."
+ },
+ {
+  "src": "first",
+  "start": 196.0,
+  "end": 201.0,
+  "text": "Our Python code then checks whether those quotations can be matched against the retrieved text."
+ },
+ {
+  "src": "first",
+  "start": 201.0,
+  "end": 205.0,
+  "text": "When a quotation matches, the system connects it to the actual source metadata."
+ },
+ {
+  "src": "first",
+  "start": 205.0,
+  "end": 208.0,
+  "text": "When it does not match, it can be marked as unverified."
+ },
+ {
+  "src": "first",
+  "start": 208.0,
+  "end": 212.0,
+  "text": "We also avoid simply trusting a document identifier supplied by the model."
+ },
+ {
+  "src": "first",
+  "start": 212.0,
+  "end": 215.0,
+  "text": "The source is mapped using the retrieved evidence and it stored metadata."
+ },
+ {
+  "src": "first",
+  "start": 215.0,
+  "end": 221.0,
+  "text": "We built this because we wanted users to inspect the evidence behind an answer instead of having to trust the model blindly."
+ },
+ {
+  "src": "first",
+  "start": 221.0,
+  "end": 229.0,
+  "text": "However, verifying that a quotation exists does not prove that the legal interpretation is correct or that a provision applies to every situation."
+ },
+ {
+  "src": "first",
+  "start": 230.0,
+  "end": 237.0,
+  "text": "Next, we developed the research application. The front end uses React, Vite and TypeScript, while fast API powers the backend."
+ },
+ {
+  "src": "first",
+  "start": 237.0,
+  "end": 243.0,
+  "text": "When a user submits a question, the interface can show the research progress including searching, ranking, drafting and verification."
+ },
+ {
+  "src": "first",
+  "start": 243.0,
+  "end": 246.0,
+  "text": "The answer is displayed with numbered citations and an evidence panel."
+ },
+ {
+  "src": "first",
+  "start": 246.0,
+  "end": 250.0,
+  "text": "Users can open-sided documents in a reader where relevant passages can be highlighted."
+ },
+ {
+  "src": "first",
+  "start": 250.0,
+  "end": 258.0,
+  "text": "We also built statute and case law search along with a comparison feature for older and newer legal codes such as IPC and BNS."
+ },
+ {
+  "src": "first",
+  "start": 258.0,
+  "end": 263.0,
+  "text": "CRPC and BNSS and the Evidence Act and BSA."
+ },
+ {
+  "src": "first",
+  "start": 263.0,
+  "end": 268.0,
+  "text": "We included browser local research history so previous research can be revisited."
+ },
+ {
+  "src": "second",
+  "start": 268.16,
+  "end": 272.96,
+  "text": "We built these features because we wanted users to do more than read an AI-generated response."
+ },
+ {
+  "src": "second",
+  "start": 272.96,
+  "end": 276.96,
+  "text": "We wanted them to explore the sources and understand how the answer was produced."
+ },
+ {
+  "src": "second",
+  "start": 276.96,
+  "end": 281.52,
+  "text": "After building the retrieval and answer pipeline, we wanted to investigate another possibility."
+ },
+ {
+  "src": "second",
+  "start": 281.52,
+  "end": 285.36,
+  "text": "Could we adapt a smaller local language model to follow the answering style"
+ },
+ {
+  "src": "second",
+  "start": 285.36,
+  "end": 288.0,
+  "text": "and structured output of our legal research system?"
+ },
+ {
+  "src": "second",
+  "start": 288.0,
+  "end": 291.76,
+  "text": "This is where fine-tuning and knowledge distillation became part of the project."
+ },
+ {
+  "src": "second",
+  "start": 291.76,
+  "end": 295.12,
+  "text": "Rag retrieves information from a knowledge base when a question is asked."
+ },
+ {
+  "src": "second",
+  "start": 295.2,
+  "end": 298.32,
+  "text": "Fine-tuning updates and models weights using training examples."
+ },
+ {
+  "src": "second",
+  "start": 298.32,
+  "end": 302.16,
+  "text": "Our goal was to explore whether carefully reviewed examples could help a smaller model"
+ },
+ {
+  "src": "second",
+  "start": 302.16,
+  "end": 304.64,
+  "text": "produce more useful legal research responses."
+ },
+ {
+  "src": "second",
+  "start": 304.64,
+  "end": 309.04,
+  "text": "We did not assume that fine-tuning would automatically make the model legally correct."
+ },
+ {
+  "src": "second",
+  "start": 309.04,
+  "end": 312.72,
+  "text": "We wanted to test it. Before training, we needed reliable examples."
+ },
+ {
+  "src": "second",
+  "start": 312.72,
+  "end": 316.8,
+  "text": "We built a pipeline for generating questions, checking their answer ability,"
+ },
+ {
+  "src": "second",
+  "start": 316.8,
+  "end": 320.0,
+  "text": "producing teacher answers, and reviewing those answers."
+ },
+ {
+  "src": "second",
+  "start": 320.0,
+  "end": 324.08,
+  "text": "The question generation process checked whether seed sources existed and whether"
+ },
+ {
+  "src": "second",
+  "start": 324.08,
+  "end": 327.36,
+  "text": "proposed evidence quotations appeared in retrieved passages."
+ },
+ {
+  "src": "second",
+  "start": 327.36,
+  "end": 332.16,
+  "text": "An independent cloud reviewer assessed questions for answerability, ambiguity, and quality."
+ },
+ {
+  "src": "second",
+  "start": 332.16,
+  "end": 335.92,
+  "text": "Teacher answers were generated through our existing answer pipeline and then passed through"
+ },
+ {
+  "src": "second",
+  "start": 335.92,
+  "end": 338.8,
+  "text": "deterministic checks in an independent grading process."
+ },
+ {
+  "src": "second",
+  "start": 338.8,
+  "end": 343.2,
+  "text": "Examples were assigned statuses such as verified, needs review, or rejected."
+ },
+ {
+  "src": "second",
+  "start": 343.2,
+  "end": 347.2,
+  "text": "We did this because training on incorrect or poorly supported answers could teach the model"
+ },
+ {
+  "src": "second",
+  "start": 347.2,
+  "end": 351.28,
+  "text": "those same mistakes. We wanted a quality control process before scaling up the dataset."
+ },
+ {
+  "src": "second",
+  "start": 351.36,
+  "end": 354.08,
+  "text": "Our first completed Laura experiment was deliberately small."
+ },
+ {
+  "src": "second",
+  "start": 354.08,
+  "end": 358.56,
+  "text": "We selected 30 verified teacher answers and used them to train a Laura adapter on"
+ },
+ {
+  "src": "second",
+  "start": 358.56,
+  "end": 364.88,
+  "text": "Quinn 3-1.7b. We used 4-bit quantization and MLX on Apple Silicon."
+ },
+ {
+  "src": "second",
+  "start": 364.88,
+  "end": 368.64,
+  "text": "After training, we compared three answer engines, the original Quinn model,"
+ },
+ {
+  "src": "second",
+  "start": 368.64,
+  "end": 371.12,
+  "text": "the fine-tuned Quinn model, and Claude."
+ },
+ {
+  "src": "second",
+  "start": 371.12,
+  "end": 375.84,
+  "text": "All three answered the same 50 held out questions using identical retrieved evidence."
+ },
+ {
+  "src": "second",
+  "start": 375.84,
+  "end": 379.92,
+  "text": "We used the same evidence because we wanted to compare how the models generated answers"
+ },
+ {
+  "src": "second",
+  "start": 380.0,
+  "end": 383.52,
+  "text": "without allowing different retrieval results to influence the comparison."
+ },
+ {
+  "src": "second",
+  "start": 383.52,
+  "end": 389.12,
+  "text": "We evaluated legal correctness, evidence support, citation accuracy, structured output,"
+ },
+ {
+  "src": "second",
+  "start": 389.12,
+  "end": 391.44,
+  "text": "hallucinated facts, and response time."
+ },
+ {
+  "src": "second",
+  "start": 391.44,
+  "end": 396.32,
+  "text": "The purpose was to understand what fine-tuning had actually improved and where it had caused problems."
+ },
+ {
+  "src": "second",
+  "start": 396.32,
+  "end": 400.0,
+  "text": "The results were mixed and that was an important learning experience."
+ },
+ {
+  "src": "second",
+  "start": 400.0,
+  "end": 404.96,
+  "text": "The fine-tuned model improved some aspects of citation behavior and structured output."
+ },
+ {
+  "src": "second",
+  "start": 405.04,
+  "end": 410.32,
+  "text": "For example, 31 out of 50 responses met our citation accuracy criterion"
+ },
+ {
+  "src": "second",
+  "start": 410.32,
+  "end": 413.44,
+  "text": "compared with zero for the base Quinn model in this test."
+ },
+ {
+  "src": "second",
+  "start": 413.44,
+  "end": 416.16,
+  "text": "However, the legal correctness results were worse."
+ },
+ {
+  "src": "second",
+  "start": 416.16,
+  "end": 420.4,
+  "text": "The base Quinn model produced 15 fully correct answers out of 50"
+ },
+ {
+  "src": "second",
+  "start": 420.4,
+  "end": 422.88,
+  "text": "while the fine-tuned model produced six."
+ },
+ {
+  "src": "second",
+  "start": 422.88,
+  "end": 427.84,
+  "text": "The fine-tuned model also had problems with malformed or truncated responses."
+ },
+ {
+  "src": "second",
+  "start": 427.84,
+  "end": 431.2,
+  "text": "So, although its overall blended score increased,"
+ },
+ {
+  "src": "second",
+  "start": 431.2,
+  "end": 435.12,
+  "text": "that increase did not represent an improvement in legal correctness,"
+ },
+ {
+  "src": "second",
+  "start": 435.12,
+  "end": 439.44,
+  "text": "we classified the pilot as a regression requiring further investigation,"
+ },
+ {
+  "src": "second",
+  "start": 439.44,
+  "end": 441.04,
+  "text": "and we did not scale it."
+ },
+ {
+  "src": "second",
+  "start": 441.04,
+  "end": 444.16,
+  "text": "This taught us that better formatting and citation behavior"
+ },
+ {
+  "src": "second",
+  "start": 444.16,
+  "end": 446.8,
+  "text": "do not necessarily mean better legal reasoning."
+ },
+ {
+  "src": "second",
+  "start": 446.8,
+  "end": 450.48,
+  "text": "We then integrated the three answer engines into the application,"
+ },
+ {
+  "src": "second",
+  "start": 450.48,
+  "end": 455.52,
+  "text": "Claude, Plain Quinn, running through Olima, and the experimental Laura Quinn model."
+ },
+ {
+  "src": "second",
+  "start": 455.52,
+  "end": 459.36,
+  "text": "The system retrieves evidence once and freezes it into an evidence bundle."
+ },
+ {
+  "src": "second",
+  "start": 459.44,
+  "end": 462.64,
+  "text": "Each selected engine then answers using that same evidence."
+ },
+ {
+  "src": "second",
+  "start": 462.64,
+  "end": 465.44,
+  "text": "This allows us to compare their responses side by side."
+ },
+ {
+  "src": "second",
+  "start": 465.44,
+  "end": 469.6,
+  "text": "Each answer has its own citation panel, evidence drawer, and model details."
+ },
+ {
+  "src": "second",
+  "start": 469.6,
+  "end": 472.88,
+  "text": "We also added structured output status checks so malformed,"
+ },
+ {
+  "src": "second",
+  "start": 472.88,
+  "end": 476.72,
+  "text": "truncated, or failed responses are visible rather than silently hidden."
+ },
+ {
+  "src": "second",
+  "start": 476.72,
+  "end": 480.88,
+  "text": "We built this comparison environment because we wanted to evaluate model behavior"
+ },
+ {
+  "src": "second",
+  "start": 480.88,
+  "end": 485.2,
+  "text": "using a consistent set of evidence and make the differences easier to inspect."
+ },
+ {
+  "src": "second",
+  "start": 485.2,
+  "end": 487.6,
+  "text": "The fine-tuned model remains experimental."
+ },
+ {
+  "src": "second",
+  "start": 487.68,
+  "end": 491.28,
+  "text": "Its presence in the application is for comparison and investigation,"
+ },
+ {
+  "src": "second",
+  "start": 491.28,
+  "end": 492.72,
+  "text": "not proof that it is better."
+ },
+ {
+  "src": "second",
+  "start": 492.72,
+  "end": 496.48,
+  "text": "We also worked on making the prototype understandable and demonstrable."
+ },
+ {
+  "src": "second",
+  "start": 496.48,
+  "end": 501.2,
+  "text": "We added a citation check panel showing proposed, matched, and rejected quotations."
+ },
+ {
+  "src": "second",
+  "start": 501.2,
+  "end": 504.08,
+  "text": "We added an evidence panel showing document identifiers,"
+ },
+ {
+  "src": "second",
+  "start": 504.08,
+  "end": 506.72,
+  "text": "pages, sections, and retrieval information."
+ },
+ {
+  "src": "second",
+  "start": 506.72,
+  "end": 510.64,
+  "text": "We made the corpus metrics and architecture visible in the application."
+ },
+ {
+  "src": "second",
+  "start": 510.64,
+  "end": 515.04,
+  "text": "We also prepared curated questions that the current corpus could answer,"
+ },
+ {
+  "src": "second",
+  "start": 515.04,
+  "end": 520.56,
+  "text": "along with a deliberately unanswerable question to demonstrate the importance of insufficient evidence."
+ },
+ {
+  "src": "second",
+  "start": 520.56,
+  "end": 525.2,
+  "text": "We tested the application through evaluation runs and a scripted browser walkthrough."
+ },
+ {
+  "src": "second",
+  "start": 525.2,
+  "end": 528.72,
+  "text": "We pushed the project to GitHub while keeping sensitive keys,"
+ },
+ {
+  "src": "second",
+  "start": 528.72,
+  "end": 533.84,
+  "text": "local databases, model artifacts, and training data out of the repository."
+ },
+ {
+  "src": "second",
+  "start": 533.84,
+  "end": 536.48,
+  "text": "So where does Indian LogyPT stand today?"
+ },
+ {
+  "src": "third",
+  "start": 536.55,
+  "end": 540.55,
+  "text": "The rag pipeline and citation verification system are live and evaluated."
+ },
+ {
+  "src": "third",
+  "start": 540.55,
+  "end": 545.19,
+  "text": "The research interface supports Claude, Plainquen, and the experimental Laura Quen model."
+ },
+ {
+  "src": "third",
+  "start": 545.19,
+  "end": 548.67,
+  "text": "The retrieval improvements have been tested against several evaluation sets,"
+ },
+ {
+  "src": "third",
+  "start": 548.67,
+  "end": 551.47,
+  "text": "and the three-engine interface has been demonstrated locally."
+ },
+ {
+  "src": "third",
+  "start": 551.47,
+  "end": 556.63,
+  "text": "However, the larger training data generation runs were stopped before teacher answers were completed."
+ },
+ {
+  "src": "third",
+  "start": 556.63,
+  "end": 561.83,
+  "text": "The 30-example Laura pilot was completed, but it did not demonstrate improved legal correctness,"
+ },
+ {
+  "src": "third",
+  "start": 561.83,
+  "end": 563.15,
+  "text": "so we did not scale it."
+ },
+ {
+  "src": "third",
+  "start": 563.15,
+  "end": 566.75,
+  "text": "The broader three-engine benchmark was also paused before completion."
+ },
+ {
+  "src": "third",
+  "start": 566.75,
+  "end": 568.47,
+  "text": "There is another important limitation."
+ },
+ {
+  "src": "third",
+  "start": 568.47,
+  "end": 572.43,
+  "text": "Hosting the front end alone does not host the back end, legal database,"
+ },
+ {
+  "src": "third",
+  "start": 572.43,
+  "end": 575.43,
+  "text": "Olama runtime, or MLX model service."
+ },
+ {
+  "src": "third",
+  "start": 575.43,
+  "end": 579.03,
+  "text": "So the current project is a demo-ready, legal research prototype,"
+ },
+ {
+  "src": "third",
+  "start": 579.03,
+  "end": 581.71,
+  "text": "not a fully deployed production grade legal service."
+ },
+ {
+  "src": "third",
+  "start": 581.71,
+  "end": 587.11,
+  "text": "Building Indian Law GPT has involved much more than connecting a language model to a collection of documents."
+ },
+ {
+  "src": "third",
+  "start": 587.11,
+  "end": 592.59,
+  "text": "We organized legal data, improved retrieval, verified citations, designed an application,"
+ },
+ {
+  "src": "third",
+  "start": 592.59,
+  "end": 596.03,
+  "text": "prepared training examples, and evaluated model behavior."
+ },
+ {
+  "src": "third",
+  "start": 596.03,
+  "end": 600.35,
+  "text": "We also learned that a model can improve in one area while getting worse in another."
+ },
+ {
+  "src": "third",
+  "start": 600.35,
+  "end": 605.15,
+  "text": "Our fine-tuning experiment showed why it is important to evaluate legal correctness separately"
+ },
+ {
+  "src": "third",
+  "start": 605.15,
+  "end": 607.47,
+  "text": "from formatting and citation performance."
+ },
+ {
+  "src": "third",
+  "start": 607.47,
+  "end": 610.55,
+  "text": "The next step is to investigate the fine-tuning regression,"
+ },
+ {
+  "src": "third",
+  "start": 610.55,
+  "end": 615.95,
+  "text": "improve the quality of training examples, and continue testing before scaling the model adaptation work."
+ },
+ {
+  "src": "third",
+  "start": 615.95,
+  "end": 620.51,
+  "text": "Ultimately, our goal is to build a legal research system where users can inspect the evidence,"
+ },
+ {
+  "src": "third",
+  "start": 620.51,
+  "end": 625.79,
+  "text": "understand the limitations, and evaluate the answers rather than simply accepting what an AI says."
+ },
+ {
+  "src": "third",
+  "start": 625.79,
+  "end": 630.11,
+  "text": "That is Indian Law GPT, an evidence-grounded legal research prototype,"
+ },
+ {
+  "src": "third",
+  "start": 630.11,
+  "end": 635.55,
+  "text": "a platform for comparing different answer engines, and a foundation for further experimentation with legal AI."
+ },
+ {
+  "src": "third",
+  "start": 635.55,
+  "end": 636.59,
+  "text": "Thank you for watching."
+ }
+]

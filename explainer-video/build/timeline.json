@@ -1,0 +1,541 @@
+{
+ "scenes": [
+  {
+   "id": "hero_problem",
+   "start": 0.0,
+   "end": 8.0,
+   "dur": 8.0,
+   "avatar": "br_lg"
+  },
+  {
+   "id": "title_card",
+   "start": 8.0,
+   "end": 12.0,
+   "dur": 4.0,
+   "avatar": "br_lg"
+  },
+  {
+   "id": "agenda",
+   "start": 12.0,
+   "end": 18.0,
+   "dur": 6.0,
+   "avatar": "br"
+  },
+  {
+   "id": "goal",
+   "start": 18.0,
+   "end": 28.0,
+   "dur": 10.0,
+   "avatar": "br"
+  },
+  {
+   "id": "not_chatbot",
+   "start": 28.0,
+   "end": 33.0,
+   "dur": 5.0,
+   "avatar": "br"
+  },
+  {
+   "id": "research_requires",
+   "start": 33.0,
+   "end": 43.0,
+   "dur": 10.0,
+   "avatar": "br"
+  },
+  {
+   "id": "core_principle",
+   "start": 43.0,
+   "end": 50.0,
+   "dur": 7.0,
+   "avatar": "br"
+  },
+  {
+   "id": "foreshadow_models",
+   "start": 50.0,
+   "end": 57.0,
+   "dur": 7.0,
+   "avatar": "br"
+  },
+  {
+   "id": "four_components",
+   "start": 57.0,
+   "end": 67.0,
+   "dur": 10.0,
+   "avatar": "br"
+  },
+  {
+   "id": "shot_home",
+   "start": 67.0,
+   "end": 76.0,
+   "dur": 9.0,
+   "avatar": "br"
+  },
+  {
+   "id": "corpus_a",
+   "start": 76.0,
+   "end": 90.0,
+   "dur": 14.0,
+   "avatar": "bl"
+  },
+  {
+   "id": "corpus_b",
+   "start": 90.0,
+   "end": 99.0,
+   "dur": 9.0,
+   "avatar": "bl"
+  },
+  {
+   "id": "corpus_indexed",
+   "start": 99.0,
+   "end": 105.0,
+   "dur": 6.0,
+   "avatar": "br"
+  },
+  {
+   "id": "coverage",
+   "start": 105.0,
+   "end": 114.0,
+   "dur": 9.0,
+   "avatar": "br"
+  },
+  {
+   "id": "coverage_caveat",
+   "start": 114.0,
+   "end": 121.0,
+   "dur": 7.0,
+   "avatar": "br"
+  },
+  {
+   "id": "search_gap",
+   "start": 121.0,
+   "end": 129.0,
+   "dur": 8.0,
+   "avatar": "br"
+  },
+  {
+   "id": "search_needs",
+   "start": 129.0,
+   "end": 138.0,
+   "dur": 9.0,
+   "avatar": "br"
+  },
+  {
+   "id": "hybrid_paths",
+   "start": 138.0,
+   "end": 149.0,
+   "dur": 11.0,
+   "avatar": "br"
+  },
+  {
+   "id": "rrf_fusion",
+   "start": 149.0,
+   "end": 160.0,
+   "dur": 11.0,
+   "avatar": "br"
+  },
+  {
+   "id": "retrieval_why",
+   "start": 160.0,
+   "end": 166.0,
+   "dur": 6.0,
+   "avatar": "br"
+  },
+  {
+   "id": "retrieval_result",
+   "start": 166.0,
+   "end": 174.0,
+   "dur": 8.0,
+   "avatar": "bl"
+  },
+  {
+   "id": "retrieval_caveat",
+   "start": 174.0,
+   "end": 178.0,
+   "dur": 4.0,
+   "avatar": "bl"
+  },
+  {
+   "id": "citation_risk",
+   "start": 178.0,
+   "end": 189.0,
+   "dur": 11.0,
+   "avatar": "br"
+  },
+  {
+   "id": "verify_flow",
+   "start": 189.0,
+   "end": 201.0,
+   "dur": 12.0,
+   "avatar": "br"
+  },
+  {
+   "id": "verify_match",
+   "start": 201.0,
+   "end": 208.0,
+   "dur": 7.0,
+   "avatar": "br"
+  },
+  {
+   "id": "verify_docid",
+   "start": 208.0,
+   "end": 215.0,
+   "dur": 7.0,
+   "avatar": "br"
+  },
+  {
+   "id": "verify_inspect",
+   "start": 215.0,
+   "end": 221.0,
+   "dur": 6.0,
+   "avatar": "br"
+  },
+  {
+   "id": "verify_caveat",
+   "start": 221.0,
+   "end": 230.0,
+   "dur": 9.0,
+   "avatar": "br"
+  },
+  {
+   "id": "tech_stack",
+   "start": 230.0,
+   "end": 237.0,
+   "dur": 7.0,
+   "avatar": "br"
+  },
+  {
+   "id": "shot_progress",
+   "start": 237.0,
+   "end": 243.0,
+   "dur": 6.0,
+   "avatar": "br"
+  },
+  {
+   "id": "shot_answer",
+   "start": 243.0,
+   "end": 246.5,
+   "dur": 3.5,
+   "avatar": "bl"
+  },
+  {
+   "id": "shot_evidence",
+   "start": 246.5,
+   "end": 250.0,
+   "dur": 3.5,
+   "avatar": "bl"
+  },
+  {
+   "id": "shot_reader",
+   "start": 250.0,
+   "end": 256.0,
+   "dur": 6.0,
+   "avatar": "br"
+  },
+  {
+   "id": "shot_lawmap",
+   "start": 256.0,
+   "end": 263.0,
+   "dur": 7.0,
+   "avatar": "br"
+  },
+  {
+   "id": "shot_history",
+   "start": 263.0,
+   "end": 268.16,
+   "dur": 5.16,
+   "avatar": "br"
+  },
+  {
+   "id": "explore_why",
+   "start": 268.16,
+   "end": 276.96,
+   "dur": 8.8,
+   "avatar": "br"
+  },
+  {
+   "id": "finetune_question",
+   "start": 276.96,
+   "end": 288.0,
+   "dur": 11.04,
+   "avatar": "br"
+  },
+  {
+   "id": "rag_vs_ft",
+   "start": 288.0,
+   "end": 304.64,
+   "dur": 16.64,
+   "avatar": "br"
+  },
+  {
+   "id": "test_not_assume",
+   "start": 304.64,
+   "end": 312.72,
+   "dur": 8.08,
+   "avatar": "br"
+  },
+  {
+   "id": "dataset_pipeline",
+   "start": 312.72,
+   "end": 327.36,
+   "dur": 14.64,
+   "avatar": "br"
+  },
+  {
+   "id": "reviewer_gates",
+   "start": 327.36,
+   "end": 338.8,
+   "dur": 11.44,
+   "avatar": "br"
+  },
+  {
+   "id": "example_statuses",
+   "start": 338.8,
+   "end": 343.2,
+   "dur": 4.4,
+   "avatar": "br"
+  },
+  {
+   "id": "qc_why",
+   "start": 343.2,
+   "end": 351.36,
+   "dur": 8.16,
+   "avatar": "br"
+  },
+  {
+   "id": "lora_setup",
+   "start": 351.36,
+   "end": 364.88,
+   "dur": 13.52,
+   "avatar": "br"
+  },
+  {
+   "id": "three_engine_test",
+   "start": 364.88,
+   "end": 375.84,
+   "dur": 10.96,
+   "avatar": "br"
+  },
+  {
+   "id": "identical_evidence",
+   "start": 375.84,
+   "end": 383.52,
+   "dur": 7.68,
+   "avatar": "br"
+  },
+  {
+   "id": "metrics_measured",
+   "start": 383.52,
+   "end": 396.32,
+   "dur": 12.8,
+   "avatar": "br"
+  },
+  {
+   "id": "results_mixed",
+   "start": 396.32,
+   "end": 400.0,
+   "dur": 3.68,
+   "avatar": "br"
+  },
+  {
+   "id": "chart_citation",
+   "start": 400.0,
+   "end": 413.44,
+   "dur": 13.44,
+   "avatar": "bl"
+  },
+  {
+   "id": "chart_correctness",
+   "start": 413.44,
+   "end": 422.88,
+   "dur": 9.44,
+   "avatar": "bl"
+  },
+  {
+   "id": "malformed",
+   "start": 422.88,
+   "end": 427.84,
+   "dur": 4.96,
+   "avatar": "br"
+  },
+  {
+   "id": "blended_caveat",
+   "start": 427.84,
+   "end": 441.04,
+   "dur": 13.2,
+   "avatar": "br"
+  },
+  {
+   "id": "lesson_format",
+   "start": 441.04,
+   "end": 446.8,
+   "dur": 5.76,
+   "avatar": "br"
+  },
+  {
+   "id": "engines_integrated",
+   "start": 446.8,
+   "end": 455.52,
+   "dur": 8.72,
+   "avatar": "br"
+  },
+  {
+   "id": "evidence_frozen",
+   "start": 455.52,
+   "end": 465.44,
+   "dur": 9.92,
+   "avatar": "br"
+  },
+  {
+   "id": "shot_three_engines",
+   "start": 465.44,
+   "end": 476.72,
+   "dur": 11.28,
+   "avatar": "br"
+  },
+  {
+   "id": "why_compare_env",
+   "start": 476.72,
+   "end": 485.2,
+   "dur": 8.48,
+   "avatar": "br"
+  },
+  {
+   "id": "still_experimental",
+   "start": 485.2,
+   "end": 492.72,
+   "dur": 7.52,
+   "avatar": "br"
+  },
+  {
+   "id": "demo_panels",
+   "start": 492.72,
+   "end": 505.04,
+   "dur": 12.32,
+   "avatar": "br"
+  },
+  {
+   "id": "curated_questions",
+   "start": 505.04,
+   "end": 520.56,
+   "dur": 15.52,
+   "avatar": "br"
+  },
+  {
+   "id": "tested_shipped",
+   "start": 520.56,
+   "end": 533.84,
+   "dur": 13.28,
+   "avatar": "br"
+  },
+  {
+   "id": "status_intro",
+   "start": 533.84,
+   "end": 536.55,
+   "dur": 2.71,
+   "avatar": "br"
+  },
+  {
+   "id": "status_live",
+   "start": 536.55,
+   "end": 551.47,
+   "dur": 14.92,
+   "avatar": "bl"
+  },
+  {
+   "id": "status_paused",
+   "start": 551.47,
+   "end": 566.75,
+   "dur": 15.28,
+   "avatar": "bl"
+  },
+  {
+   "id": "status_hosting",
+   "start": 566.75,
+   "end": 579.03,
+   "dur": 12.28,
+   "avatar": "bl"
+  },
+  {
+   "id": "demo_not_prod",
+   "start": 579.03,
+   "end": 581.71,
+   "dur": 2.68,
+   "avatar": "br"
+  },
+  {
+   "id": "recap",
+   "start": 581.71,
+   "end": 596.03,
+   "dur": 14.32,
+   "avatar": "br"
+  },
+  {
+   "id": "lesson_tradeoff",
+   "start": 596.03,
+   "end": 607.47,
+   "dur": 11.44,
+   "avatar": "br"
+  },
+  {
+   "id": "next_steps",
+   "start": 607.47,
+   "end": 616.0,
+   "dur": 8.53,
+   "avatar": "br"
+  },
+  {
+   "id": "goal_philosophy",
+   "start": 616.0,
+   "end": 625.79,
+   "dur": 9.79,
+   "avatar": "br"
+  },
+  {
+   "id": "closing",
+   "start": 625.79,
+   "end": 635.2,
+   "dur": 9.41,
+   "avatar": "br_lg"
+  },
+  {
+   "id": "thank_you",
+   "start": 635.2,
+   "end": 638.2,
+   "dur": 3.0,
+   "avatar": "br_lg"
+  }
+ ],
+ "avatar_states": {
+  "br": {
+   "size": 380,
+   "x": 1470,
+   "y": 630
+  },
+  "br_sm": {
+   "size": 300,
+   "x": 1560,
+   "y": 720
+  },
+  "br_lg": {
+   "size": 470,
+   "x": 1360,
+   "y": 520
+  },
+  "bl": {
+   "size": 380,
+   "x": 70,
+   "y": 630
+  },
+  "bl_sm": {
+   "size": 300,
+   "x": 60,
+   "y": 720
+  }
+ },
+ "end": 638.2,
+ "sources": [
+  "First video.mp4",
+  "Second .mp4",
+  "Third.mp4"
+ ]
+}
